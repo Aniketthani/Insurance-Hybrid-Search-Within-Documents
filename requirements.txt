@@ -13,4 +13,5 @@ rich>=13.0.0
 torch>=2.0.0
 transformers>=4.40.0
 streamlit
+torchvision
 groq
