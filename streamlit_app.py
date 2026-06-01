@@ -1,863 +1,1505 @@
 """
-Insurance Document RAG — Streamlit UI
-======================================
-Full web interface for the P&C / Reinsurance Hybrid Search PoC.
-Wraps the existing src/ pipeline with a clean, professional UI.
-
-Run:
-    streamlit run streamlit_app.py
+Insurance Document RAG — Streamlit UI v4
+Beautiful, professional design:
+  - Deep navy + slate sidebar with glowing accents
+  - Warm ivory main canvas — easy on eyes, not plain white
+  - Gold / emerald / sapphire accent system
+  - Glassmorphism result cards with gradient borders
+  - Typography-first hierarchy
 """
 
-import os
-import sys
-import io
-import math
-import tempfile
-import time
-import re
-
-# ── Path fix so src/ imports work regardless of CWD ──────────────────────
+import os, sys, tempfile, time, re
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
 import streamlit as st
 
-# ── Page config (must be FIRST streamlit call) ────────────────────────────
 st.set_page_config(
-    page_title="Insurance RAG · Hybrid Search",
-    page_icon="🏛",
+    page_title="InsureSearch · AI Document Intelligence",
+    page_icon="🛡",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-from src.parser     import InsuranceDocumentParser
-from src.chunker    import InsuranceChunker
-from src.search_index import InsuranceHybridSearchIndex, EMBEDDER_OPTIONS
-from src.rag_engine import InsuranceRAGEngine, SearchEvaluator, RAGResponse, GroqLLM, GROQ_MODELS
-from src.sample_docs import SAMPLE_DOCS, get_sample_queries
+from src.parser       import InsuranceDocumentParser
+from src.chunker      import InsuranceChunker
+from src.search_index import (InsuranceHybridSearchIndex, EMBEDDER_OPTIONS, compute_risk_score)
+from src.rag_engine   import (InsuranceRAGEngine, SearchEvaluator,
+                               GroqLLM, GROQ_MODELS, OpenAILLM, OPENAI_MODELS)
+from src.sample_docs  import SAMPLE_DOCS, get_sample_queries
 
-# ─────────────────────────────────────────────────────────────────────────
-# STYLING
-# ─────────────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# DESIGN SYSTEM — Rich, Readable, Beautiful
+# Palette:
+#   Sidebar  : #0D1B2A (deep navy) / #1A2D40 (cards)
+#   Canvas   : #F5F0E8 (warm ivory — NOT cold white)
+#   Primary  : #C9A84C (burnished gold)
+#   Success  : #2ECC8E (emerald)
+#   Info     : #4B9EE8 (sapphire)
+#   Danger   : #E85C5C (coral red)
+#   Text     : #1C2B3A (near-black on light) / #E8EEF5 (near-white on dark)
+# ══════════════════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
-/* ── Global font & background ── */
-html, body, [class*="css"]  { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap');
 
-/* ── Sidebar ── */
-section[data-testid="stSidebar"] { background: #0f1e3d; }
-section[data-testid="stSidebar"] * { color: orange !important; }
-section[data-testid="stSidebar"] .stSelectbox label,
-section[data-testid="stSidebar"] .stSlider label,
-section[data-testid="stSidebar"] .stCheckbox label { color: #a8c4e8 !important; font-size: 13px !important; }
-
-/* ── Top header bar ── */
-.rag-header {
-    background: linear-gradient(135deg, #0f1e3d 0%, #1b3a6b 60%, #2e75b6 100%);
-    padding: 22px 32px 18px 32px;
-    border-radius: 12px;
-    margin-bottom: 20px;
-    border-left: 5px solid #1d9e75;
+/* ── Global reset ── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body, [class*="css"] {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
-.rag-header h1 { color: #ffffff !important; font-size: 26px !important; margin: 0 0 4px 0; }
-.rag-header p  { color: #a8d4f5 !important; font-size: 13px; margin: 0; }
 
-/* ── Metric cards ── */
-.metric-card {
-    background: #f5f8ff;
-    border: 1px solid #d0ddf5;
-    border-left: 4px solid #2e75b6;
-    border-radius: 8px;
-    padding: 14px 18px;
-    margin-bottom: 8px;
+/* ══════════════════════════════════════════
+   MAIN CANVAS — warm ivory, not cold white
+══════════════════════════════════════════ */
+.main .block-container {
+    background: #F5F0E8;
+    padding: 2rem 2.5rem 3rem;
 }
-.metric-card .label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
-.metric-card .value { font-size: 22px; font-weight: 700; color: #1b3a6b; margin-top: 2px; }
+.stApp { background: #F5F0E8; }
 
-/* ── Result cards ── */
-.result-card {
-    background: #ffffff;
-    border: 1px solid #e0e8f5;
-    border-left: 4px solid #2e75b6;
+/* ══════════════════════════════════════════
+   SIDEBAR — deep navy, rich, readable
+══════════════════════════════════════════ */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0D1B2A 0%, #122233 60%, #0D1B2A 100%);
+    border-right: none;
+}
+section[data-testid="stSidebar"] .block-container {
+    background: transparent;
+    padding: 1.5rem 1.25rem;
+}
+section[data-testid="stSidebar"] * {
+    color: #C8D8E8 !important;
+}
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] strong {
+    color: #EEF4FA !important;
+}
+section[data-testid="stSidebar"] label {
+    color: #94ABBE !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.3px !important;
+}
+section[data-testid="stSidebar"] .stTextInput input,
+section[data-testid="stSidebar"] .stSelectbox > div > div {
+    background: #1A2D40 !important;
+    border: 1px solid #2A4560 !important;
+    color: #EEF4FA !important;
+    border-radius: 8px !important;
+}
+section[data-testid="stSidebar"] .stSlider > div > div > div {
+    background: #2A4560 !important;
+}
+section[data-testid="stSidebar"] .stCheckbox label {
+    color: #C8D8E8 !important;
+    font-size: 13px !important;
+}
+section[data-testid="stSidebar"] .stRadio label {
+    color: #C8D8E8 !important;
+    font-size: 13px !important;
+}
+/* Primary build button in sidebar */
+section[data-testid="stSidebar"] .stButton > button {
+    background: linear-gradient(135deg, #C9A84C, #E2C06A) !important;
+    color: #0D1B2A !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+    letter-spacing: 0.3px !important;
+    transition: all 0.2s !important;
+}
+section[data-testid="stSidebar"] .stButton > button:hover {
+    filter: brightness(1.08) !important;
+    transform: translateY(-1px) !important;
+}
+/* Secondary clear button override */
+section[data-testid="stSidebar"] .stButton + .stButton > button {
+    background: rgba(255,255,255,0.06) !important;
+    color: #94ABBE !important;
+    border: 1px solid #2A4560 !important;
+}
+
+/* ══════════════════════════════════════════
+   SIDEBAR SECTION CARDS
+══════════════════════════════════════════ */
+.sb-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
     border-radius: 10px;
-    padding: 16px 20px;
+    padding: 14px 16px 10px;
+    margin: 0 0 12px;
+}
+.sb-card-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: #C9A84C !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.sb-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(46,204,142,0.15);
+    color: #2ECC8E !important;
+    border: 1px solid rgba(46,204,142,0.3);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 600;
     margin-bottom: 14px;
-    box-shadow: 0 2px 8px rgba(30,58,107,0.06);
-    transition: box-shadow 0.2s;
 }
-.result-card:hover { box-shadow: 0 4px 16px rgba(30,58,107,0.12); }
-.result-card.rank-1 { border-left-color: #1d9e75; background: #f8fffc; }
-.result-card .result-header {
-    display: flex; justify-content: space-between; align-items: flex-start;
-    margin-bottom: 8px; gap: 12px;
+.sb-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: #2ECC8E;
+    border-radius: 50%;
+    display: inline-block;
 }
-.result-card .doc-name  { font-weight: 600; color: #1b3a6b; font-size: 14px; }
-.result-card .section   { color: #2e75b6; font-size: 13px; }
-.result-card .snippet   { color: #333; font-size: 13px; line-height: 1.65; margin-top: 8px; }
-.result-card .figures   { background: #fff8e6; border: 1px solid #f0d080;
-                           border-radius: 6px; padding: 6px 10px; margin-top: 8px;
-                           font-size: 12px; color: #7a5500; }
-.score-badge {
-    display: inline-block; background: #1b3a6b; color: #fff;
-    border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 600;
+
+/* ══════════════════════════════════════════
+   PAGE HEADER
+══════════════════════════════════════════ */
+.page-hero {
+    background: linear-gradient(135deg, #0D1B2A 0%, #1A3550 50%, #1C3D5C 100%);
+    border-radius: 16px;
+    padding: 28px 36px;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+}
+.page-hero::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(201,168,76,0.15) 0%, transparent 70%);
+    pointer-events: none;
+}
+.hero-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #F0EAD6 !important;
+    margin: 0 0 6px;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+}
+.hero-subtitle {
+    font-size: 13px;
+    color: #7A9BB5 !important;
+    margin: 0;
+    line-height: 1.5;
+}
+.hero-pills {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-end;
+}
+.hero-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #C8D8E8 !important;
     white-space: nowrap;
 }
-.score-row  { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-.score-chip {
-    font-size: 11px; border-radius: 4px; padding: 2px 8px; font-weight: 500;
+.hero-pill .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    display: inline-block;
 }
-.chip-bm25   { background: #e8f0fb; color: #1b4a9e; }
-.chip-vec    { background: #e6faf3; color: #0e6642; }
-.chip-rrf    { background: #fff0e6; color: #8b3a00; }
-.chip-rerank { background: #f0e6ff; color: #5a0099; }
+.dot-gold    { background: #C9A84C; }
+.dot-emerald { background: #2ECC8E; }
+.dot-sapphire{ background: #4B9EE8; }
 
-/* ── Info boxes ── */
-.info-box {
-    border-radius: 8px; padding: 12px 16px; margin: 10px 0; font-size: 13px;
+/* ══════════════════════════════════════════
+   METRIC STRIP
+══════════════════════════════════════════ */
+.metric-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin: 20px 0 24px;
 }
-.info-green  { background: #eafaf3; border-left: 4px solid #1d9e75; color: #0e5432; }
-.info-blue   { background: #e8f0fb; border-left: 4px solid #2e75b6; color: #1b3a6b; }
-.info-orange { background: #fff4e6; border-left: 4px solid #e07b00; color: #7a3d00; }
-.info-red    { background: #fdecea; border-left: 4px solid #c0392b; color: #7a1a12; }
-
-/* ── Score progress bars ── */
-.score-bar-wrap { background: #e8eef8; border-radius: 4px; height: 6px; margin: 4px 0 8px 0; }
-.score-bar-fill { height: 6px; border-radius: 4px; }
-
-/* ── Query input ── */
-.stTextInput input {
-    border: 2px solid #d0ddf5 !important; border-radius: 8px !important;
-    font-size: 15px !important; padding: 10px 14px !important;
+.metric-card {
+    background: #FFFFFF;
+    border-radius: 12px;
+    padding: 18px 20px;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    position: relative;
+    overflow: hidden;
 }
-.stTextInput input:focus { border-color: #2e75b6 !important; box-shadow: 0 0 0 3px rgba(46,117,182,0.15) !important; }
+.metric-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+}
+.mc-plain::after  { background: #D1D5DB; }
+.mc-sapphire::after { background: linear-gradient(90deg, #4B9EE8, #7BB8F0); }
+.mc-emerald::after  { background: linear-gradient(90deg, #2ECC8E, #4FD9A8); }
+.mc-gold::after     { background: linear-gradient(90deg, #C9A84C, #E2C06A); }
+.mc-danger::after   { background: linear-gradient(90deg, #E85C5C, #F08080); }
+.mc-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #9CA3AF;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 6px;
+}
+.mc-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #1C2B3A;
+    line-height: 1.1;
+}
+.mc-value span { font-size: 14px; color: #9CA3AF; font-weight: 400; }
 
-/* ── Tabs ── */
-.stTabs [data-baseweb="tab-list"] { background: #f0f4fa; border-radius: 8px; padding: 4px; }
-.stTabs [data-baseweb="tab"]      { border-radius: 6px; font-weight: 500; }
+/* ══════════════════════════════════════════
+   QUERY INPUT AREA
+══════════════════════════════════════════ */
+.query-wrap {
+    background: #FFFFFF;
+    border: 2px solid #E8E0D0;
+    border-radius: 14px;
+    padding: 4px 6px;
+    margin-bottom: 8px;
+    transition: border-color 0.2s;
+}
+.query-wrap:focus-within { border-color: #C9A84C; }
+.stTextInput > div > div > input {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-size: 16px !important;
+    font-weight: 400 !important;
+    color: #1C2B3A !important;
+    padding: 12px 16px !important;
+    box-shadow: none !important;
+}
+.stTextInput > div > div > input::placeholder { color: #B8A898 !important; }
+.stTextInput > div { border: none !important; box-shadow: none !important; }
 
-/* ── Code blocks ── */
-code { background: #1e2030 !important; color: #e8f4fd !important; border-radius: 4px !important; }
+/* ══════════════════════════════════════════
+   SUGGESTION CHIPS
+══════════════════════════════════════════ */
+.sugg-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #9C8E7A;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin: 16px 0 8px;
+}
+.stButton > button {
+    background: #FFFFFF !important;
+    color: #4A5568 !important;
+    border: 1.5px solid #E2D9C8 !important;
+    border-radius: 8px !important;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    padding: 7px 12px !important;
+    text-align: left !important;
+    white-space: normal !important;
+    line-height: 1.45 !important;
+    transition: all 0.15s !important;
+}
+.stButton > button:hover {
+    background: #FDF8EE !important;
+    border-color: #C9A84C !important;
+    color: #8B6914 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 3px 10px rgba(201,168,76,0.15) !important;
+}
+/* Primary action overrides */
+div[data-testid="column"] .stButton > button[kind="primary"],
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #1C3D5C, #2A5580) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    letter-spacing: 0.3px !important;
+    border-radius: 10px !important;
+    padding: 10px 24px !important;
+}
+.stButton > button[kind="primary"]:hover {
+    filter: brightness(1.1) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 16px rgba(28,61,92,0.3) !important;
+}
 
-/* ── Expander ── */
-.streamlit-expanderHeader { font-weight: 600; color: #1b3a6b; }
+/* ══════════════════════════════════════════
+   RESULT CARDS  — premium glassmorphism
+══════════════════════════════════════════ */
+.result-card {
+    background: #FFFFFF;
+    border-radius: 14px;
+    padding: 20px 22px;
+    margin-bottom: 14px;
+    border: 1px solid rgba(0,0,0,0.07);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.2s, transform 0.15s;
+}
+.result-card:hover {
+    box-shadow: 0 6px 24px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+.result-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 5px;
+    border-radius: 14px 0 0 14px;
+}
+.rc-gold::before    { background: linear-gradient(180deg, #C9A84C, #E2C06A); }
+.rc-sapphire::before{ background: linear-gradient(180deg, #4B9EE8, #74B8F5); }
+.rc-emerald::before { background: linear-gradient(180deg, #2ECC8E, #4FD9A8); }
+.rc-violet::before  { background: linear-gradient(180deg, #8B5CF6, #A78BFA); }
+.rc-coral::before   { background: linear-gradient(180deg, #E85C5C, #F08080); }
+.rc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 12px;
+}
+.rc-rank-badge {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+.rank-1 { background: #FEF3C7; color: #92400E; }
+.rank-2 { background: #DBEAFE; color: #1E40AF; }
+.rank-3 { background: #D1FAE5; color: #065F46; }
+.rank-4 { background: #F3E8FF; color: #5B21B6; }
+.rank-5 { background: #FEE2E2; color: #991B1B; }
+.rc-doc-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1C2B3A;
+    margin-bottom: 3px;
+    line-height: 1.3;
+}
+.rc-section {
+    font-size: 12px;
+    color: #8C7A6A;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.rc-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    flex-shrink: 0;
+}
+.score-badge {
+    background: linear-gradient(135deg, #1C2B3A, #2A3E54);
+    color: #E2C06A !important;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+.risk-pill {
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.risk-HIGH   { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
+.risk-MEDIUM { background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
+.risk-LOW    { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
+.rc-divider {
+    height: 1px;
+    background: #F0EAE0;
+    margin: 10px 0;
+}
+.rc-snippet {
+    font-size: 13.5px;
+    color: #4A5568;
+    line-height: 1.7;
+}
+.rc-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 12px;
+}
+.chip {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 6px;
+    letter-spacing: 0.2px;
+}
+.chip-bm25   { background: #EFF6FF; color: #1D4ED8; }
+.chip-cosine { background: #ECFDF5; color: #065F46; }
+.chip-rrf    { background: #FFF7ED; color: #9A3412; }
+.chip-phrase { background: #F5F3FF; color: #5B21B6; }
+.chip-rerank { background: #FEF2F2; color: #991B1B; }
+.rc-figures {
+    background: linear-gradient(135deg, #FFFBEB, #FEF3C7);
+    border: 1px solid #FDE68A;
+    border-radius: 8px;
+    padding: 7px 12px;
+    margin-top: 10px;
+    font-size: 12px;
+    color: #78350F;
+    font-weight: 500;
+}
+.rc-riskwords {
+    font-size: 11px;
+    color: #9C8E7A;
+    margin-top: 5px;
+}
+
+/* ══════════════════════════════════════════
+   LLM ANSWER BOX
+══════════════════════════════════════════ */
+.llm-box {
+    background: linear-gradient(135deg, #F0FDF8, #E6FAF3);
+    border: 1px solid #6EE7B7;
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin: 0 0 22px;
+    position: relative;
+    overflow: hidden;
+}
+.llm-box::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #2ECC8E, #4B9EE8);
+}
+.llm-box.warn {
+    background: linear-gradient(135deg, #FFFBEB, #FEF9E7);
+    border-color: #FCD34D;
+}
+.llm-box.warn::before { background: linear-gradient(90deg, #F59E0B, #EF4444); }
+.llm-label {
+    font-size: 10px;
+    font-weight: 800;
+    color: #059669 !important;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.llm-label.warn { color: #D97706 !important; }
+.llm-text {
+    font-size: 14px;
+    color: #1C2B3A;
+    line-height: 1.8;
+}
+
+/* ══════════════════════════════════════════
+   GUARDRAIL STRIP
+══════════════════════════════════════════ */
+.guardrail {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 18px;
+}
+.guardrail.pass { background: #ECFDF5; border: 1px solid #A7F3D0; color: #065F46; }
+.guardrail.warn { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
+.guardrail-icon { font-size: 16px; }
+
+/* ══════════════════════════════════════════
+   WELCOME CARDS
+══════════════════════════════════════════ */
+.welcome-card {
+    background: #FFFFFF;
+    border: 1px solid #E8E0D0;
+    border-radius: 14px;
+    padding: 22px 24px;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+}
+.welcome-card:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.08); }
+.welcome-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+}
+.wc-gold::before    { background: linear-gradient(90deg, #C9A84C, #E2C06A); }
+.wc-emerald::before { background: linear-gradient(90deg, #2ECC8E, #4FD9A8); }
+.wc-sapphire::before{ background: linear-gradient(90deg, #4B9EE8, #74B8F5); }
+.wc-icon  { font-size: 26px; margin-bottom: 12px; }
+.wc-title { font-size: 15px; font-weight: 700; color: #1C2B3A; margin-bottom: 8px; }
+.wc-body  { font-size: 13px; color: #7A6E62; line-height: 1.65; }
+.wc-step  { font-size: 13px; color: #5C6B7A; line-height: 1.9; }
+.wc-step strong { color: #1C2B3A; }
+
+/* ══════════════════════════════════════════
+   SECTION LABELS
+══════════════════════════════════════════ */
+.section-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #9C8E7A;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 22px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #E8E0D0;
+}
+
+/* ══════════════════════════════════════════
+   DOCUMENT LIST ITEMS
+══════════════════════════════════════════ */
+.doc-item {
+    background: #FFFFFF;
+    border: 1px solid #E8E0D0;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: box-shadow 0.15s;
+}
+.doc-item:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
+.doc-name  { font-size: 14px; font-weight: 600; color: #1C2B3A; }
+.doc-meta  { font-size: 12px; color: #9C8E7A; margin-top: 2px; }
+.lob-tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    display: inline-block;
+}
+.lob-life  { background: #EFF6FF; color: #1D4ED8; }
+.lob-pc    { background: #ECFDF5; color: #065F46; }
+.lob-rei   { background: #F5F3FF; color: #5B21B6; }
+.lob-comp  { background: #FFF7ED; color: #9A3412; }
+.doc-count { font-size: 20px; font-weight: 700; color: #1C2B3A; text-align: right; }
+.doc-count-label { font-size: 11px; color: #9C8E7A; text-align: right; }
+
+/* ══════════════════════════════════════════
+   EXPANDERS  — clean and consistent
+══════════════════════════════════════════ */
+.streamlit-expanderHeader {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #4A5568 !important;
+    background: #FAF6F0 !important;
+    border-radius: 8px !important;
+    padding: 10px 14px !important;
+}
+.streamlit-expanderContent {
+    background: #FDFAF6 !important;
+    border-radius: 0 0 8px 8px !important;
+}
+
+/* ══════════════════════════════════════════
+   TABS  — elegant underline style
+══════════════════════════════════════════ */
+.stTabs [data-baseweb="tab-list"] {
+    background: transparent !important;
+    border-bottom: 2px solid #E8E0D0 !important;
+    gap: 4px;
+    margin-bottom: 4px;
+}
+.stTabs [data-baseweb="tab"] {
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+    color: #9C8E7A !important;
+    padding: 10px 20px !important;
+    background: transparent !important;
+    border-bottom: 3px solid transparent !important;
+    margin-bottom: -2px !important;
+    border-radius: 0 !important;
+    transition: color 0.15s !important;
+}
+.stTabs [data-baseweb="tab"]:hover { color: #5C4E3A !important; }
+.stTabs [aria-selected="true"] {
+    color: #1C2B3A !important;
+    border-bottom-color: #C9A84C !important;
+    font-weight: 600 !important;
+}
+
+/* ══════════════════════════════════════════
+   METRICS (native Streamlit)
+══════════════════════════════════════════ */
+[data-testid="stMetric"] {
+    background: #FFFFFF;
+    border: 1px solid #E8E0D0;
+    border-radius: 10px;
+    padding: 14px 18px;
+}
+[data-testid="stMetricLabel"] { font-size: 12px !important; color: #9C8E7A !important; }
+[data-testid="stMetricValue"] { font-size: 22px !important; color: #1C2B3A !important; font-weight: 700 !important; }
+
+/* ══════════════════════════════════════════
+   INFO / SUCCESS / WARNING boxes
+══════════════════════════════════════════ */
+.stAlert { border-radius: 10px !important; font-size: 13px !important; }
+
+/* ══════════════════════════════════════════
+   DATAFRAME
+══════════════════════════════════════════ */
+.stDataFrame { border-radius: 10px; overflow: hidden; }
+
+/* ══════════════════════════════════════════
+   RISK SCORE PANEL
+══════════════════════════════════════════ */
+.risk-panel {
+    background: #FFFFFF;
+    border: 1px solid #E8E0D0;
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+}
+.risk-panel-title {
+    font-size: 11px;
+    font-weight: 800;
+    color: #9C8E7A;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.risk-panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #E8E0D0;
+}
+.risk-kw-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+.risk-kw-tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid;
+}
+.rkw-high   { background: #FEF2F2; color: #991B1B; border-color: #FECACA; }
+.rkw-medium { background: #FFFBEB; color: #92400E; border-color: #FDE68A; }
+.rkw-low    { background: #ECFDF5; color: #065F46; border-color: #A7F3D0; }
+.risk-score-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.risk-score-big {
+    font-size: 36px;
+    font-weight: 800;
+    line-height: 1;
+}
+.risk-score-big.HIGH   { color: #991B1B; }
+.risk-score-big.MEDIUM { color: #92400E; }
+.risk-score-big.LOW    { color: #065F46; }
+.risk-bar-wrap {
+    flex: 1;
+    background: #F0EAE0;
+    border-radius: 6px;
+    height: 10px;
+    overflow: hidden;
+}
+.risk-bar-fill {
+    height: 10px;
+    border-radius: 6px;
+    transition: width 0.4s ease;
+}
+.risk-bar-fill.HIGH   { background: linear-gradient(90deg, #E85C5C, #C0392B); }
+.risk-bar-fill.MEDIUM { background: linear-gradient(90deg, #E2C06A, #C9A84C); }
+.risk-bar-fill.LOW    { background: linear-gradient(90deg, #4FD9A8, #2ECC8E); }
+
+/* ══════════════════════════════════════════
+   GUARDRAIL DETAIL PANEL
+══════════════════════════════════════════ */
+.grd-panel {
+    background: #FFFFFF;
+    border: 1px solid #E8E0D0;
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-top: 16px;
+}
+.grd-panel.grd-pass { border-top: 3px solid #2ECC8E; }
+.grd-panel.grd-warn { border-top: 3px solid #C9A84C; }
+.grd-panel.grd-fail { border-top: 3px solid #E85C5C; }
+.grd-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #F0EAE0;
+    font-size: 13px;
+}
+.grd-row:last-child { border-bottom: none; }
+.grd-label { color: #7A6E62; font-weight: 500; }
+.grd-value { font-weight: 600; color: #1C2B3A; }
+.grd-value.pass  { color: #065F46; }
+.grd-value.warn  { color: #92400E; }
+.grd-value.fail  { color: #991B1B; }
+.grd-bar-wrap {
+    width: 120px;
+    background: #F0EAE0;
+    border-radius: 4px;
+    height: 6px;
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 8px;
+}
+.grd-bar-fill {
+    height: 6px;
+    border-radius: 4px;
+}
+.grd-bar-high   { background: #2ECC8E; }
+.grd-bar-medium { background: #C9A84C; }
+.grd-bar-low    { background: #E85C5C; }
+
+/* No reference found */
+.no-ref-box {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    border-left: 4px solid #E85C5C;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: #991B1B;
+    font-weight: 500;
+}
+.no-ref-box .nr-icon { font-size: 20px; margin-right: 8px; }
+
+/* ══════════════════════════════════════════
+   SCROLLBAR
+══════════════════════════════════════════ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #F0EAE0; }
+::-webkit-scrollbar-thumb { background: #C8B89A; border-radius: 3px; }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# SESSION STATE INITIALISATION
-# ─────────────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# SESSION STATE
+# ══════════════════════════════════════════════════════════════════════════════
 def init_state():
-    defaults = {
-        "engine":         None,
-        "index":          None,
-        "indexed_docs":   [],
-        "query_history":  [],
-        "last_response":  None,
-        "eval_results":   None,
-        "building":       False,
-        "last_elapsed_ms": 0,
-        "groq_api_key":   "",
-        "groq_enabled":   False,
-        "embedder_type":  "tfidf",
-    }
-    for k, v in defaults.items():
+    for k, v in dict(
+        engine=None, index=None, indexed_docs=[],
+        query_history=[], last_response=None, last_elapsed_ms=0,
+        eval_results=None, embedder_type="tfidf",
+    ).items():
         if k not in st.session_state:
             st.session_state[k] = v
 
 init_state()
 
-
-# ─────────────────────────────────────────────────────────────────────────
-# DOCUMENT TYPE DETECTION
-# ─────────────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
 DOC_TYPE_HINTS = {
-    "policy":      ("Property & Casualty", "Policy"),
-    "treaty":      ("Reinsurance",         "Treaty"),
-    "claims":      ("Property & Casualty", "Claims"),
-    "sop":         ("Property & Casualty", "SOP"),
-    "endorsement": ("Property & Casualty", "Endorsement"),
-    "compliance":  ("Compliance",          "Regulatory"),
-    "underwriting":("Reinsurance",         "Underwriting"),
+    "policy":("Life Insurance","Policy"), "term":("Life Insurance","Policy"),
+    "ulip":("Life Insurance","ULIP"),    "health":("Life Insurance","Health"),
+    "rider":("Life Insurance","Rider"),  "receipt":("Life Insurance","Receipt"),
+    "acord":("P&C","ACORD"),             "coi":("P&C","ACORD"),
+    "certificate":("P&C","ACORD"),       "treaty":("Reinsurance","Treaty"),
+    "claims":("P&C","Claims"),           "compliance":("Compliance","Regulatory"),
+    "proposal":("Life Insurance","Proposal"), "endorsement":("Life Insurance","Endorsement"),
 }
-
-def detect_doc_type(name: str):
+def detect_doc_type(name):
     nl = name.lower()
-    for kw, (lob, cat) in DOC_TYPE_HINTS.items():
-        if kw in nl:
-            return lob, cat
-    return "Property & Casualty", "Policy"
+    for kw,(lob,cat) in DOC_TYPE_HINTS.items():
+        if kw in nl: return lob, cat
+    return "Life Insurance","Policy"
+
+def lob_tag_cls(lob):
+    return {"Life Insurance":"lob-life","P&C":"lob-pc",
+            "Reinsurance":"lob-rei","Compliance":"lob-comp"}.get(lob,"lob-life")
+
+def rc_color_cls(rank):
+    return {1:"rc-gold",2:"rc-sapphire",3:"rc-emerald",4:"rc-violet",5:"rc-coral"}.get(rank,"")
+
+def rank_badge_cls(rank):
+    return {1:"rank-1",2:"rank-2",3:"rank-3",4:"rank-4",5:"rank-5"}.get(rank,"rank-1")
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# PIPELINE BUILDER  (cached to avoid re-indexing on every rerun)
-# ─────────────────────────────────────────────────────────────────────────
-def build_pipeline(
-    use_demo: bool,
-    pdf_bytes_list: list,
-    use_reranker: bool,
-    top_k: int,
-    embedder_type: str = "tfidf",
-    llm_fn=None,
-):
-    """Parse, chunk, index all documents. Returns (engine, index, indexed_docs)."""
+# ══════════════════════════════════════════════════════════════════════════════
+# PIPELINE
+# ══════════════════════════════════════════════════════════════════════════════
+def build_pipeline(use_demo, pdf_files, use_reranker, top_k, embedder_type, llm_fn):
     parser = InsuranceDocumentParser(verbose=False)
     index  = InsuranceHybridSearchIndex(
-        use_reranker=use_reranker,
-        verbose=False,
-        embedder_type=embedder_type,
-    )
-    all_chunks   = []
+        use_reranker=use_reranker, verbose=False, embedder_type=embedder_type)
     indexed_docs = []
-
     if use_demo:
-        for doc_name, doc_text in SAMPLE_DOCS.items():
-            lob, cat = detect_doc_type(doc_name)
-            parsed = parser.parse(doc_text)
-            parsed.doc_name = doc_name
-            chunker = InsuranceChunker(lob=lob, doc_category=cat, verbose=False)
-            chunks  = chunker.chunk(parsed)
-            all_chunks.extend(chunks)
-            n_child = sum(1 for c in chunks if c.chunk_type == "child")
-            indexed_docs.append({
-                "name": doc_name, "lob": lob, "category": cat,
-                "chunks": n_child, "source": "demo"
-            })
-
-    for name, data in pdf_bytes_list:
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
-            f.write(data)
-            tmp_path = f.name
+        for dn, dt in SAMPLE_DOCS.items():
+            lob, cat = detect_doc_type(dn)
+            parsed   = parser.parse(dt, display_name=dn.replace("_"," ").title())
+            parsed.doc_name = dn
+            chunks   = InsuranceChunker(lob=lob, doc_category=cat, verbose=False).chunk(parsed)
+            index.add_chunks(chunks, display_name=parsed.display_name)
+            indexed_docs.append({"display_name":parsed.display_name,"doc_name":dn,
+                                  "lob":lob,"category":cat,
+                                  "chunks":sum(1 for c in chunks if c.chunk_type=="child"),
+                                  "source":"demo"})
+    for f in (pdf_files or []):
+        lob, cat = detect_doc_type(f.name)
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(f.read()); tp = tmp.name
         try:
-            lob, cat = detect_doc_type(name)
-            parsed  = parser.parse(tmp_path)
-            chunker = InsuranceChunker(lob=lob, doc_category=cat, verbose=False)
-            chunks  = chunker.chunk(parsed)
-            all_chunks.extend(chunks)
-            n_child = sum(1 for c in chunks if c.chunk_type == "child")
-            indexed_docs.append({
-                "name": os.path.splitext(name)[0], "lob": lob,
-                "category": cat, "chunks": n_child, "source": "upload"
-            })
+            parsed = parser.parse(tp, display_name=f.name)
+            chunks = InsuranceChunker(lob=lob, doc_category=cat, verbose=False).chunk(parsed)
+            index.add_chunks(chunks, display_name=f.name)
+            indexed_docs.append({"display_name":f.name,"doc_name":parsed.doc_name,
+                                  "lob":lob,"category":cat,
+                                  "chunks":sum(1 for c in chunks if c.chunk_type=="child"),
+                                  "source":"upload"})
         finally:
-            os.unlink(tmp_path)
-
-    if all_chunks:
-        index.add_chunks(all_chunks)
-
+            os.unlink(tp)
     engine = InsuranceRAGEngine(
-        search_index=index,
-        top_k=top_k,
-        use_parent_context=True,
-        context_only=(llm_fn is None),
-        llm_fn=llm_fn,
-        verbose=False,
-    )
+        search_index=index, top_k=top_k, use_parent_context=True,
+        context_only=(llm_fn is None), llm_fn=llm_fn, verbose=False)
     return engine, index, indexed_docs
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# RESULT CARD RENDERER
-# ─────────────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# RESULT CARD
+# ══════════════════════════════════════════════════════════════════════════════
 def render_result_card(r, rank: int):
-    card_class = "result-card rank-1" if rank == 1 else "result-card"
-    rank_icon  = "🥇" if rank == 1 else f"#{rank}"
+    dn      = r.chunk.display_name if hasattr(r.chunk,"display_name") else r.chunk.doc_name
+    snippet = r.chunk.raw_text.replace("\n"," ").strip()
+    snippet = (snippet[:440]+"…") if len(snippet)>440 else snippet
+    snippet = snippet.replace("<","&lt;").replace(">","&gt;")
 
-    # Scores
-    bm25_pct   = min(100, int(r.bm25_score  * 100 / max(r.bm25_score, 1)))
-    vec_pct    = min(100, int(r.vector_score * 100))
-    rerank_pct = min(100, max(0, int((r.rerank_score or 0) / 10 * 100))) if r.rerank_score else None
-    final_pct  = min(100, int(r.final_score * 100 / max(r.final_score, 0.001)))
+    rcc   = rc_color_cls(rank)
+    rbc   = rank_badge_cls(rank)
+    risk  = r.risk_info or compute_risk_score(r.chunk.raw_text, r.chunk.doc_category)
+    rl    = risk.get("level","LOW")
 
-    snippet = r.chunk.raw_text.replace("\n", " ").strip()
-    snippet = snippet[:420] + "…" if len(snippet) > 420 else snippet
+    phrase_chip = (f'<span class="chip chip-phrase">Phrase +{r.phrase_score:.2f}</span>'
+                   if r.phrase_score > 0 else "")
+    rerank_chip = (f'<span class="chip chip-rerank">Rerank {r.rerank_score:.3f}</span>'
+                   if r.rerank_score is not None else "")
 
     figs_html = ""
     if r.chunk.numeric_values:
-        figs = ", ".join(r.chunk.numeric_values[:6])
-        figs_html = f'<div class="figures">💰 Key figures: {figs}</div>'
+        figs_html = (f'<div class="rc-figures">'
+                     f'Key figures &nbsp;·&nbsp; '
+                     f'{" &nbsp;·&nbsp; ".join(r.chunk.numeric_values[:6])}</div>')
 
-    rerank_chip = ""
-    if r.rerank_score is not None:
-        rerank_chip = f'<span class="score-chip chip-rerank">Rerank {r.rerank_score:.3f}</span>'
-
-    st.markdown(f"""
-<div class="{card_class}">
-  <div class="result-header">
-    <div>
-      <div class="doc-name">{rank_icon}  {r.chunk.doc_name}</div>
-      <div class="section">📂 {r.chunk.section_title} &nbsp;·&nbsp; Page {r.chunk.page_num}</div>
-    </div>
-    <div>
-      <span class="score-badge">Score {r.final_score:.4f}</span>
-    </div>
-  </div>
-  <div class="score-row">
-    <span class="score-chip chip-bm25">BM25 {r.bm25_score:.3f}</span>
-    <span class="score-chip chip-vec">Cosine {r.vector_score:.3f}</span>
-    <span class="score-chip chip-rrf">RRF {r.rrf_score:.4f}</span>
-    {rerank_chip}
-  </div>
-  <div class="score-bar-wrap"><div class="score-bar-fill" style="width:{final_pct}%;background:#2e75b6;"></div></div>
-  <div class="snippet">{snippet}</div>
-  {figs_html}
-</div>
-""", unsafe_allow_html=True)
-
-
-# ─────────────────────────────────────────────────────────────────────────
-# GUARDRAIL PANEL
-# ─────────────────────────────────────────────────────────────────────────
-def render_guardrail_panel(resp: RAGResponse):
-    gs = resp.groundedness_score
-    icon  = "✅" if resp.guardrail_passed else "⚠️"
-    color = "info-green" if resp.guardrail_passed else "info-orange"
-    status = "PASSED" if resp.guardrail_passed else "WARNINGS RAISED"
+    mkws = risk.get("matched_keywords",[])
+    kw_html = (f'<div class="rc-riskwords">Risk signals: {", ".join(mkws[:5])}</div>'
+               if mkws else "")
 
     st.markdown(f"""
-<div class="info-box {color}">
-  <strong>{icon} Guardrail: {status}</strong><br>
-  📊 Groundedness score: <strong>{gs:.1%}</strong>
-  {"".join(f"<br>• {w}" for w in resp.guardrail_warnings)}
-</div>
-""", unsafe_allow_html=True)
+<div class="result-card {rcc}">
+  <div class="rc-header">
+    <div style="display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0">
+      <div class="rc-rank-badge {rbc}">#{rank}</div>
+      <div style="min-width:0;flex:1">
+        <div class="rc-doc-name">{dn}</div>
+        <div class="rc-section">
+          <span style="opacity:.5">▸</span>
+          {r.chunk.section_title} &nbsp;·&nbsp; p.{r.chunk.page_num}
+        </div>
+      </div>
+    </div>
+    <div class="rc-right">
+      <span class="score-badge">{r.final_score:.4f}</span>
+      <span class="risk-pill risk-{rl}">Risk: {rl}</span>
+    </div>
+  </div>
+  <div class="rc-divider"></div>
+  <div class="rc-snippet">{snippet}</div>
+  <div class="rc-chips">
+    <span class="chip chip-bm25">BM25 &nbsp;{r.bm25_score:.3f}</span>
+    <span class="chip chip-cosine">Cosine &nbsp;{r.vector_score:.3f}</span>
+    <span class="chip chip-rrf">RRF &nbsp;{r.rrf_score:.4f}</span>
+    {phrase_chip}{rerank_chip}
+  </div>
+  {figs_html}{kw_html}
+</div>""", unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
 # SIDEBAR
-# ─────────────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("### 🏛 Insurance RAG")
-    st.markdown("<hr style='border-color:#2e5080;margin:8px 0'>", unsafe_allow_html=True)
+    st.markdown("""
+<div style="padding:8px 0 18px">
+  <div style="font-size:20px;font-weight:800;color:#EEF4FA;letter-spacing:-0.5px">
+    🛡 InsureSearch
+  </div>
+  <div style="font-size:11px;color:#5A7A96;margin-top:3px;font-weight:500;letter-spacing:0.3px">
+    AI · DOCUMENT INTELLIGENCE
+  </div>
+</div>""", unsafe_allow_html=True)
 
-    st.markdown("#### 📂 Document Sources")
-    use_demo = st.checkbox("Use built-in sample docs", value=True,
-                           help="Loads 3 sample documents: Property Policy, Reinsurance Treaty, Claims SOP")
-    uploaded = st.file_uploader("Upload PDFs", type=["pdf"],
-                                accept_multiple_files=True,
-                                help="Upload your own P&C or Reinsurance PDFs")
+    if st.session_state.engine:
+        st.markdown('<div class="sb-badge">Index active · ChromaDB</div>',
+                    unsafe_allow_html=True)
 
-    st.markdown("<hr style='border-color:#2e5080;margin:8px 0'>", unsafe_allow_html=True)
-    st.markdown("#### 🧠 Embedding Model")
+    # ── Documents ──
+    st.markdown('<div class="sb-card"><div class="sb-card-title">📂 Documents</div>',
+                unsafe_allow_html=True)
+    use_demo = st.checkbox("Built-in demo documents", value=True)
+    uploaded = st.file_uploader("Upload PDFs", type=["pdf"], accept_multiple_files=True,
+                                help="Term plans, ULIPs, ACORD forms, receipts, riders")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    embedder_choice = st.selectbox(
-        "Embedding engine",
-        options=list(EMBEDDER_OPTIONS.keys()),
-        index=0,
-        format_func=lambda k: {
-            "tfidf":   "TF-IDF (offline, no GPU)",
-            "bge":     "BGE-large-en-v1.5 (neural)",
-            "qwen3vl": "Qwen3-VL-8B (best for PDFs)",
-        }.get(k, k),
-        help="TF-IDF works offline. BGE and Qwen3-VL need HuggingFace model download.",
-    )
-    if embedder_choice == "qwen3vl":
-        st.caption("⚠️ Requires ~16 GB download + GPU recommended")
-    elif embedder_choice == "bge":
-        st.caption("⚠️ Requires HuggingFace model download (~1.3 GB)")
+    # ── Embedding ──
+    st.markdown('<div class="sb-card"><div class="sb-card-title">🧠 Embedding Engine</div>',
+                unsafe_allow_html=True)
+    embedder_choice = st.selectbox("Engine", list(EMBEDDER_OPTIONS.keys()),
+        label_visibility="collapsed",
+        format_func=lambda k: {"tfidf":"TF-IDF  (offline)",
+                               "bge":"BGE-large  (neural)",
+                               "qwen3vl":"Qwen3-VL-8B  (GPU)"}.get(k,k))
+    if embedder_choice=="qwen3vl": st.caption("⚠ ~16 GB · GPU required")
+    elif embedder_choice=="bge":   st.caption("⚠ HuggingFace download")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("<hr style='border-color:#2e5080;margin:8px 0'>", unsafe_allow_html=True)
-    st.markdown("#### ⚙️ Search Settings")
+    # ── Search ──
+    st.markdown('<div class="sb-card"><div class="sb-card-title">⚙ Search Settings</div>',
+                unsafe_allow_html=True)
+    top_k        = st.slider("Results per query", 1, 10, 5)
+    use_reranker = st.checkbox("Enable reranker", True)
+    bm25_w       = st.slider("BM25 weight α", 0.0, 1.0, 0.45, 0.05)
+    vec_w        = round(1.0 - bm25_w, 2)
+    st.caption(f"Semantic β = {vec_w}  ·  Phrase bonus = 0.25")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    top_k = st.slider("Results per query", min_value=1, max_value=10, value=5)
-    use_reranker = st.checkbox("Enable reranker", value=True,
-                               help="BM25 position-weighted reranker improves precision")
-    bm25_w = st.slider("BM25 weight (α)", 0.0, 1.0, 0.40, 0.05,
-                       help="Weight for keyword matching. 1-α = semantic weight.")
-    vec_w  = round(1.0 - bm25_w, 2)
-    st.caption(f"Semantic weight (β) = **{vec_w}**")
+    # ── Filter ──
+    st.markdown('<div class="sb-card"><div class="sb-card-title">🔎 Filter</div>',
+                unsafe_allow_html=True)
+    doc_filter_input = st.text_input("By document name", placeholder="e.g. Life Term Policy")
+    lob_sel    = st.selectbox("By line of business",
+                              ["All","Life Insurance","P&C","Reinsurance","Compliance"])
+    lob_filter = None if lob_sel=="All" else lob_sel
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("<hr style='border-color:#2e5080;margin:8px 0'>", unsafe_allow_html=True)
-    st.markdown("#### 🤖 LLM — ChatGroq")
+    # ── LLM ──
+    st.markdown('<div class="sb-card"><div class="sb-card-title">🤖 Language Model</div>',
+                unsafe_allow_html=True)
+    llm_choice = st.radio("Provider", ["None","Groq","OpenAI"], horizontal=True,
+                          label_visibility="collapsed")
+    groq_key, groq_model     = "", GroqLLM.DEFAULT_MODEL
+    openai_key, openai_model = "", OpenAILLM.DEFAULT_MODEL
+    groq_enabled = openai_enabled = False
+    if llm_choice == "Groq":
+        groq_enabled = True
+        groq_key   = st.text_input("Groq API key", type="password", placeholder="gsk_...")
+        groq_model = st.selectbox("Groq model", list(GROQ_MODELS.keys()),
+                                  format_func=lambda k: GROQ_MODELS[k].split("—")[0].strip())
+    elif llm_choice == "OpenAI":
+        openai_enabled = True
+        openai_key   = st.text_input("OpenAI API key", type="password", placeholder="sk-...")
+        openai_model = st.selectbox("OpenAI model", list(OPENAI_MODELS.keys()),
+                                    format_func=lambda k: OPENAI_MODELS[k].split("—")[0].strip())
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    groq_enabled = st.checkbox(
-        "Enable Groq answer generation",
-        value=False,
-        help="When enabled, retrieved passages are sent to Groq to generate a full answer.",
-    )
-    groq_api_key = ""
-    groq_model   = GroqLLM.DEFAULT_MODEL
-    if groq_enabled:
-        groq_api_key = st.text_input(
-            "Groq API key",
-            type="password",
-            placeholder="gsk_...",
-            help="Get a free key at https://console.groq.com",
-        )
-        groq_model = st.selectbox(
-            "Groq model",
-            options=list(GROQ_MODELS.keys()),
-            index=0,
-            format_func=lambda k: GROQ_MODELS.get(k, k).split(" — ")[0],
-        )
-        if groq_api_key:
-            st.caption(f"Model: `{groq_model}`")
-        else:
-            st.warning("Enter your Groq API key above to activate LLM answers.")
-
-    st.markdown("<hr style='border-color:#2e5080;margin:8px 0'>", unsafe_allow_html=True)
-    st.markdown("#### 🔍 Query Filter")
-    doc_filter_opt = st.text_input("Filter by document name", placeholder="e.g. reinsurance_treaty")
-    lob_filter_opt = st.selectbox("Filter by Line of Business",
-                                  ["(all)", "Property & Casualty", "Reinsurance", "Compliance"])
-    lob_filter = None if lob_filter_opt == "(all)" else lob_filter_opt
-
-    st.markdown("<hr style='border-color:#2e5080;margin:8px 0'>", unsafe_allow_html=True)
-
-    build_btn = st.button("🚀 Build / Rebuild Index", use_container_width=True, type="primary")
+    st.markdown("")
+    c1, c2 = st.columns(2)
+    build_btn = c1.button("🚀 Build Index", type="primary", use_container_width=True)
+    clear_btn = c2.button("Clear Index", use_container_width=True)
 
     if st.session_state.engine:
         stats = st.session_state.index.stats()
-        st.markdown("<hr style='border-color:#2e5080;margin:8px 0'>", unsafe_allow_html=True)
-        st.markdown("#### 📊 Index Stats")
-        st.caption(f"Child chunks: **{stats['total_child_chunks']}**")
-        st.caption(f"Parent sections: **{stats['total_parent_sections']}**")
-        st.caption(f"Engine: **{stats['embedding_engine']}**")
-        st.caption(f"Embedder type: **{stats.get('embedder_type','tfidf')}**")
-        st.caption(f"Vector dim: **{stats['vector_dimensions']:,}**")
-        st.caption(f"Reranker: **{stats['reranker']}**")
-        st.caption(f"BM25 k1=1.5, b=0.6 | RRF k={stats['rrf_k']}")
+        st.markdown(f"""
+<div style="padding:12px 0 0;border-top:1px solid rgba(255,255,255,0.06);margin-top:8px">
+  <div style="font-size:12px;color:#5A7A96;line-height:1.9">
+    Chunks &nbsp;<span style="color:#C8D8E8;font-weight:600">
+      {stats['total_child_chunks']}</span><br>
+    Sections &nbsp;<span style="color:#C8D8E8;font-weight:600">
+      {stats['total_parent_sections']}</span><br>
+    Embedder &nbsp;<span style="color:#C8D8E8;font-weight:600">
+      {stats['embedder_type']}</span><br>
+    Dim &nbsp;<span style="color:#C8D8E8;font-weight:600">
+      {stats['vector_dimensions']:,}</span>
+  </div>
+</div>""", unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# INDEX BUILD
-# ─────────────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# CLEAR / BUILD
+# ══════════════════════════════════════════════════════════════════════════════
+if clear_btn and st.session_state.index:
+    st.session_state.index.clear_index()
+    for k in ("engine","indexed_docs","last_response"):
+        st.session_state[k] = None if k!="indexed_docs" else []
+    st.sidebar.success("Index cleared")
+    st.rerun()
+
 if build_btn:
-    pdf_bytes_list = [(f.name, f.read()) for f in uploaded] if uploaded else []
-    if not use_demo and not pdf_bytes_list:
-        st.sidebar.error("Select sample docs or upload at least one PDF.")
+    if not use_demo and not uploaded:
+        st.sidebar.error("Select demo docs or upload PDFs first.")
     else:
-        # Build Groq LLM if enabled and key provided
         llm_fn = None
-        if groq_enabled and groq_api_key.strip():
-            try:
-                llm_fn = GroqLLM(api_key=groq_api_key.strip(), model=groq_model)
-            except Exception as e:
-                st.sidebar.error(f"Groq init failed: {e}")
-                llm_fn = None
-
-        spinner_msg = "⚙️ Parsing, chunking and indexing documents"
-        if embedder_choice == "qwen3vl":
-            spinner_msg += " (Qwen3-VL encoding — this may take a few minutes)…"
-        elif embedder_choice == "bge":
-            spinner_msg += " (BGE neural encoding)…"
-        else:
-            spinner_msg += "…"
-
-        with st.spinner(spinner_msg):
+        if groq_enabled and groq_key.strip():
+            try:   llm_fn = GroqLLM(api_key=groq_key.strip(), model=groq_model)
+            except Exception as e: st.sidebar.error(f"Groq: {e}")
+        elif openai_enabled and openai_key.strip():
+            try:   llm_fn = OpenAILLM(api_key=openai_key.strip(), model=openai_model)
+            except Exception as e: st.sidebar.error(f"OpenAI: {e}")
+        with st.spinner(f"Building index with {embedder_choice}…"):
             t0 = time.time()
             engine, index, indexed_docs = build_pipeline(
-                use_demo, pdf_bytes_list, use_reranker, top_k,
-                embedder_type=embedder_choice,
-                llm_fn=llm_fn,
-            )
-            # Apply custom weights
+                use_demo, uploaded, use_reranker, top_k, embedder_choice, llm_fn)
             index.BM25_WEIGHT   = bm25_w
             index.VECTOR_WEIGHT = vec_w
             elapsed = time.time() - t0
-
-        st.session_state.engine       = engine
-        st.session_state.index        = index
-        st.session_state.indexed_docs = indexed_docs
-        st.session_state.eval_results = None
-        st.session_state.query_history= []
-
-        st.sidebar.success(f"✅ Index built in {elapsed:.1f}s — {len(indexed_docs)} document(s) loaded")
+        st.session_state.update(engine=engine, index=index, indexed_docs=indexed_docs,
+                                eval_results=None, query_history=[])
+        st.sidebar.success(f"✅  Ready — {len(indexed_docs)} docs in {elapsed:.1f}s")
         st.rerun()
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# HEADER
-# ─────────────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="rag-header">
-  <h1>🏛 Insurance Document RAG — Hybrid Search</h1>
-  <p>BM25 · Hybrid Cosine Search · RRF Fusion · Reranker &nbsp;|&nbsp; Embeddings: TF-IDF / BGE / Qwen3-VL &nbsp;|&nbsp; LLM: ChatGroq &nbsp;|&nbsp; P&amp;C / Reinsurance</p>
-</div>
-""", unsafe_allow_html=True)
+# ══════════════════════════════════════════════════════════════════════════════
+# HERO HEADER
+# ══════════════════════════════════════════════════════════════════════════════
+provider_label = ("Groq · " + groq_model.replace("-"," ").title() if groq_enabled and groq_key else
+                  "OpenAI · " + openai_model if openai_enabled and openai_key else
+                  "No LLM")
+st.markdown(f"""
+<div class="page-hero">
+  <div>
+    <div class="hero-title">Insurance Document Intelligence</div>
+    <div class="hero-subtitle">
+      Semantic search across life insurance policies · ACORD forms · Receipts · Riders
+    </div>
+  </div>
+  <div class="hero-pills">
+    <div class="hero-pill">
+      <span class="dot dot-gold"></span> BM25 + Cosine + RRF
+    </div>
+    <div class="hero-pill">
+      <span class="dot dot-emerald"></span> {embedder_choice.upper()} embeddings
+    </div>
+    <div class="hero-pill">
+      <span class="dot dot-sapphire"></span> {provider_label}
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# NO INDEX YET — WELCOME SCREEN
-# ─────────────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# WELCOME STATE
+# ══════════════════════════════════════════════════════════════════════════════
 if not st.session_state.engine:
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("""
-<div class="info-box info-blue">
-  <strong>🚀 Quick Start</strong><br>
-  1. Tick <em>Use built-in sample docs</em> in the sidebar<br>
-  2. Click <strong>Build / Rebuild Index</strong><br>
-  3. Type a query below and press Enter
-</div>
-""", unsafe_allow_html=True)
-    with col2:
-        st.markdown("""
-<div class="info-box info-green">
-  <strong>📄 Your own PDFs</strong><br>
-  Upload any P&C or Reinsurance PDF from the sidebar.
-  Name files with keywords like <em>policy</em>, <em>treaty</em>, <em>claims</em>
-  for auto LOB tagging.
-</div>
-""", unsafe_allow_html=True)
-    with col3:
-        st.markdown("""
-<div class="info-box info-orange">
-  <strong>⚡ Architecture</strong><br>
-  Phase 1: Layout-aware PDF parsing<br>
-  Phase 2: Clause-boundary chunking<br>
-  Phase 3: BM25 + cosine + RRF fusion<br>
-  Phase 4: Parent context expansion<br>
-  Phase 5: Numerical audit guardrails
-</div>
-""", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3, gap="medium")
+    c1.markdown("""<div class="welcome-card wc-gold">
+  <div class="wc-icon">⚡</div>
+  <div class="wc-title">Get started in 30 seconds</div>
+  <div class="wc-step">
+    <strong>1.</strong> Tick <em>Built-in demo documents</em> in the sidebar<br>
+    <strong>2.</strong> Click <em>Build Index</em><br>
+    <strong>3.</strong> Type any insurance question below
+  </div>
+</div>""", unsafe_allow_html=True)
+    c2.markdown("""<div class="welcome-card wc-emerald">
+  <div class="wc-icon">📄</div>
+  <div class="wc-title">Supported document types</div>
+  <div class="wc-body">
+    Term insurance plans &amp; ULIPs<br>
+    Health benefit riders<br>
+    ACORD COI / certificate forms<br>
+    Premium payment receipts<br>
+    Proposals &amp; endorsements
+  </div>
+</div>""", unsafe_allow_html=True)
+    c3.markdown("""<div class="welcome-card wc-sapphire">
+  <div class="wc-icon">💾</div>
+  <div class="wc-title">Persistent vector index</div>
+  <div class="wc-body">
+    ChromaDB stores your index on disk.<br>
+    Restart the app — documents stay.<br>
+    Connect Groq or OpenAI for full<br>
+    natural-language answers.
+  </div>
+</div>""", unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.subheader("Example queries you can ask after indexing")
+    st.markdown('<div class="section-label">Sample queries to try</div>', unsafe_allow_html=True)
     examples = [
-        ("🔢 Deductible lookup", "What is the deductible for flood damage?"),
-        ("🛡 Coverage check",   "Does this policy cover cyber-induced business interruption?"),
-        ("📋 Treaty structure", "What is the attachment point for Layer 1 reinsurance?"),
-        ("⏱ Claims SLA",       "How quickly must a large claim be notified?"),
-        ("💰 Limit & capacity", "What is the maximum reinsurance liability per occurrence?"),
-        ("👤 Authority",        "Who has authority to handle claims above $2 million?"),
+        ("Organ donor coverage",  "Is organ donor medical expense covered under the policy?"),
+        ("Death benefit",         "What is the death benefit sum assured for the term plan?"),
+        ("Premium lapse",         "What happens if I miss the premium payment?"),
+        ("ULIP fund options",     "What fund options and NAV values are in the ULIP?"),
+        ("Surrender value",       "What is the surrender charge if I exit in Year 2?"),
+        ("ACORD limits",          "What is the general aggregate limit in the ACORD COI?"),
     ]
-    cols = st.columns(3)
-    for i, (label, q) in enumerate(examples):
-        cols[i % 3].markdown(f"**{label}**  \n`{q}`")
-
+    g1, g2, g3 = st.columns(3, gap="small")
+    for i,(lbl,q) in enumerate(examples):
+        [g1,g2,g3][i%3].markdown(f"**{lbl}**  \n`{q}`")
     st.stop()
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# MAIN TABS
-# ─────────────────────────────────────────────────────────────────────────
-#tab_search, tab_history, tab_eval, tab_docs = st.tabs([
-#    "🔍 Search", "📜 History", "📊 Evaluation", "📁 Indexed Documents"
-#])
-tab_search, tab_history, tab_docs = st.tabs([
-    "🔍 Search", "📜 History", "📁 Indexed Documents"
+# ══════════════════════════════════════════════════════════════════════════════
+# TABS
+# ══════════════════════════════════════════════════════════════════════════════
+tab_search, tab_hist, tab_docs = st.tabs([
+    "  🔍  Search  ", "  🕐  History  ", "  📁  Documents  "
 ])
+# Evaluation tab commented out — re-enable by adding back "  📊  Evaluation  " and tab_eval
 
-# ══════════════════════════════════════════════════════════════════════════
-# TAB 1 — SEARCH
-# ══════════════════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────
+# SEARCH TAB
+# ─────────────────────────────────────────────────────────
 with tab_search:
-    # ── Suggested queries ──────────────────────────────────────────────
-    st.markdown("**💡 Suggested queries** — click to fill:")
-    suggest_queries = [
-        "What is the deductible for flood damage?",
-        "Does this policy cover cyber attacks?",
-        "What is the attachment point for Layer 1?",
-        "Who handles claims above $2 million?",
-        "What is the maximum reinsurance liability?",
-        "Basis of settlement for building losses",
+    st.markdown('<div class="section-label">Quick queries</div>', unsafe_allow_html=True)
+    suggs = [
+        "Is organ donor medical expense covered under the policy?",
+        "What is the sum assured for the term plan?",
+        "What happens if I miss the premium payment?",
+        "What fund options are available in the ULIP?",
+        "What is the surrender charge if I exit in Year 2?",
+        "What is the general aggregate limit in the ACORD certificate?",
     ]
-    cols = st.columns(3)
-    for i, sq in enumerate(suggest_queries):
-        if cols[i % 3].button(sq, key=f"sug_{i}", use_container_width=True):
+    sc1, sc2, sc3 = st.columns(3, gap="small")
+    for i, sq in enumerate(suggs):
+        if [sc1,sc2,sc3][i%3].button(sq, key=f"sug_{i}", use_container_width=True):
             st.session_state["prefill_query"] = sq
 
-    st.markdown("---")
-
-    # ── Query input ───────────────────────────────────────────────────
+    st.markdown("")
     prefill = st.session_state.pop("prefill_query", "")
-    query = st.text_input(
-        "Enter your insurance query",
-        value=prefill,
-        placeholder="e.g. What is the deductible for flood damage?",
-        label_visibility="collapsed",
-    )
+    query   = st.text_input("query", value=prefill,
+                             placeholder="Ask anything about your insurance documents…",
+                             label_visibility="collapsed")
 
-    col_search, col_clear = st.columns([5, 1])
-    search_clicked = col_search.button("🔍 Search", type="primary", use_container_width=True)
-    if col_clear.button("Clear", use_container_width=True):
-        st.session_state.last_response = None
-        st.rerun()
+    qa, qb = st.columns([8, 1], gap="small")
+    do_search = qa.button("Search", type="primary", use_container_width=True)
+    if qb.button("✕", use_container_width=True):
+        st.session_state.last_response = None; st.rerun()
 
-    # ── Run search ─────────────────────────────────────────────────────
-    if (search_clicked or query) and query.strip():
-        doc_filter = doc_filter_opt.strip() or None
-        lob_filter_val = None if lob_filter_opt == "(all)" else lob_filter_opt
-
-        with st.spinner("🔎 Searching…"):
-            t0 = time.time()
+    if (do_search or query) and query.strip():
+        df_in = doc_filter_input.strip() or None
+        with st.spinner("Searching your documents…"):
+            t0   = time.time()
             resp = st.session_state.engine.query(
-                query,
-                doc_filter=doc_filter,
-                lob_filter=lob_filter_val,
-            )
-            elapsed_ms = (time.time() - t0) * 1000
-
-        st.session_state.last_response = resp
+                query, doc_filter=df_in, lob_filter=lob_filter)
+            elapsed_ms = (time.time()-t0)*1000
+        st.session_state.last_response   = resp
         st.session_state.last_elapsed_ms = elapsed_ms
-        st.session_state.query_history.insert(0, {
-            "query": query, "response": resp, "ms": elapsed_ms
-        })
+        st.session_state.query_history.insert(0,{"query":query,"response":resp,"ms":elapsed_ms})
 
-    # ── Display results ─────────────────────────────────────────────────
     resp = st.session_state.last_response
     if resp:
-        n = len(resp.source_chunks)
-        elapsed_ms = st.session_state.get("last_elapsed_ms", 0)
-        col_a, col_b, col_c, col_d = st.columns(4)
-        col_a.markdown(f"""<div class="metric-card"><div class="label">Results</div><div class="value">{n}</div></div>""", unsafe_allow_html=True)
-        col_b.markdown(f"""<div class="metric-card"><div class="label">Latency</div><div class="value">{elapsed_ms:.0f} ms</div></div>""", unsafe_allow_html=True)
-        col_c.markdown(f"""<div class="metric-card"><div class="label">Groundedness</div><div class="value">{resp.groundedness_score:.1%}</div></div>""", unsafe_allow_html=True)
-        col_d.markdown(f"""<div class="metric-card"><div class="label">Guardrail</div><div class="value">{"✅" if resp.guardrail_passed else "⚠️"}</div></div>""", unsafe_allow_html=True)
+        n          = len(resp.source_chunks)
+        elapsed_ms = st.session_state.get("last_elapsed_ms",0)
+        gs         = resp.groundedness_score
 
-        st.markdown("---")
+        # No reference found banner
+        if resp.no_reference_found:
+            st.markdown("""<div class="no-ref-box">
+  <span class="nr-icon">⚠</span>
+  <strong>No Reference Found</strong> — The LLM could not find relevant information
+  in the indexed documents for this query. Try uploading documents that contain
+  the relevant content, or rephrase your query.
+</div>""", unsafe_allow_html=True)
 
-        # ── LLM answer (Groq) — show when available ────────────────────
+        # Metric strip
+        grd_clr   = "mc-emerald" if resp.guardrail_passed else "mc-danger"
+        grd_val   = "Passed" if resp.guardrail_passed else "Warning"
+        gs_clr    = "mc-emerald" if gs>=0.7 else "mc-gold" if gs>=0.4 else "mc-danger"
+
+        st.markdown(f"""
+<div class="metric-row">
+  <div class="metric-card mc-plain">
+    <div class="mc-label">Results</div>
+    <div class="mc-value">{n}</div>
+  </div>
+  <div class="metric-card mc-sapphire">
+    <div class="mc-label">Latency</div>
+    <div class="mc-value">{elapsed_ms:.0f}<span> ms</span></div>
+  </div>
+  <div class="metric-card {gs_clr}">
+    <div class="mc-label">Groundedness</div>
+    <div class="mc-value">{gs:.0%}</div>
+  </div>
+  <div class="metric-card {grd_clr}">
+    <div class="mc-label">Guardrail</div>
+    <div class="mc-value" style="font-size:18px">{grd_val}</div>
+  </div>
+</div>""", unsafe_allow_html=True)
+
+        # LLM answer
         if resp.answer and not resp.answer.startswith("Query:"):
-            st.markdown("### 🤖 Groq Answer")
-            guardrail_color = "success" if resp.guardrail_passed else "warning"
-            with st.container():
-                st.markdown(
-                    f"""<div style="background:var(--background-color);border:1px solid {'#1d9e75' if resp.guardrail_passed else '#e07b00'};
-                    border-left:4px solid {'#1d9e75' if resp.guardrail_passed else '#e07b00'};
-                    border-radius:8px;padding:16px 20px;margin-bottom:12px;font-size:14px;line-height:1.7">
-                    {resp.answer.replace(chr(10), '<br>')}
-                    </div>""",
-                    unsafe_allow_html=True,
-                )
-            if resp.guardrail_warnings:
-                for w in resp.guardrail_warnings:
-                    st.warning(w)
-            if resp.numerical_audit.get("unverified"):
-                st.warning(f"🔢 Unverified figures in answer: "
-                           f"{', '.join(resp.numerical_audit['unverified'][:5])}")
-            st.divider()
+            box_cls   = "llm-box" if resp.guardrail_passed else "llm-box warn"
+            lbl_cls   = "llm-label" if resp.guardrail_passed else "llm-label warn"
+            prov      = ("Groq" if groq_enabled else "OpenAI" if openai_enabled else "LLM")
+            txt       = resp.answer.replace("<","&lt;").replace(">","&gt;").replace("\n","<br>")
+            st.markdown(f"""
+<div class="{box_cls}">
+  <div class="{lbl_cls}">◆ {prov} Answer</div>
+  <div class="llm-text">{txt}</div>
+</div>""", unsafe_allow_html=True)
+            for w in resp.guardrail_warnings: st.warning(w)
 
-        # Score breakdown expander
-        with st.expander("📐 Score breakdown — how the hybrid ranking works", expanded=False):
-            st.markdown("""
-| Component | Role | Weight |
-|---|---|---|
-| **BM25 (keyword)** | Exact term frequency matching — great for policy numbers, clause IDs | α |
-| **TF-IDF cosine (semantic)** | Vector similarity — captures synonyms and concept overlap | β |
-| **RRF fusion** | Merges both ranked lists by rank position — scale invariant | — |
-| **Reranker** | Position-weighted term overlap re-scoring on top-N candidates | final sort |
-""")
-            if resp.source_chunks:
-                import pandas as pd
-                rows = []
-                for i, r in enumerate(resp.source_chunks):
-                    rows.append({
-                        "Rank": i + 1,
-                        "Document": r.chunk.doc_name,
-                        "Section": r.chunk.section_title[:40],
-                        "BM25": round(r.bm25_score, 4),
-                        "Cosine": round(r.vector_score, 4),
-                        "RRF": round(r.rrf_score, 5),
-                        "Rerank": round(r.rerank_score, 3) if r.rerank_score else "—",
-                        "Final": round(r.final_score, 4),
-                    })
-                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        # Score breakdown
+        with st.expander("Score breakdown — how results were ranked", expanded=False):
+            import pandas as pd
+            rows = [{
+                "Rank":i+1,
+                "Document": st.session_state.index.get_display_name(r.chunk),
+                "Section": r.chunk.section_title[:42],
+                "BM25":   round(r.bm25_score,4),
+                "Cosine": round(r.vector_score,4),
+                "Phrase": round(r.phrase_score,3),
+                "RRF":    round(r.rrf_score,5),
+                "Rerank": round(r.rerank_score,3) if r.rerank_score else "—",
+                "Final":  round(r.final_score,4),
+                "Risk":   r.risk_info["level"] if r.risk_info else "—",
+            } for i,r in enumerate(resp.source_chunks)]
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
         # Result cards
-        st.markdown(f"### 📄 Top {n} results for: *{resp.query}*")
+        st.markdown(f'<div class="section-label">Top {n} results</div>', unsafe_allow_html=True)
         for i, r in enumerate(resp.source_chunks):
-            render_result_card(r, i + 1)
+            render_result_card(r, i+1)
 
-        # Parent context expander
+        # Full section context
         if resp.parent_contexts:
-            with st.expander(f"📖 Parent context sections ({len(resp.parent_contexts)} loaded for LLM)", expanded=False):
-                st.markdown("*These full sections would be injected into an LLM prompt for answer generation:*")
+            with st.expander(f"Full section context · {len(resp.parent_contexts)} sections loaded"):
                 for pc in resp.parent_contexts:
-                    st.markdown(f"**{pc.doc_name} · {pc.section_title}**")
-                    st.text_area("", value=pc.raw_text[:1000] + ("…" if len(pc.raw_text) > 1000 else ""),
-                                 height=140, disabled=True, label_visibility="collapsed",
+                    dn = getattr(pc,"display_name",pc.doc_name)
+                    st.markdown(f"**{dn}  ·  {pc.section_title}**")
+                    st.text_area("", value=pc.raw_text[:1000]+
+                                 ("…" if len(pc.raw_text)>1000 else ""),
+                                 height=130, disabled=True,
+                                 label_visibility="collapsed",
                                  key=f"pc_{pc.chunk_id}")
 
-        # Guardrail
-        render_guardrail_panel(resp)
+        st.markdown("")
+        left_col, right_col = st.columns(2, gap="large")
 
-        # LLM prompt preview
-        with st.expander("🔧 LLM prompt preview (connect your own LLM)", expanded=False):
-            st.markdown("""
-> **To enable full answer generation**, set `context_only=False` and pass an `llm_fn` callable to `InsuranceRAGEngine`.
-> Below is the exact prompt that would be sent:
-""")
-            if resp.source_chunks:
-                context_preview = "\n\n---\n\n".join(
-                    f"[Source {i+1}: {r.chunk.doc_name}, Section: {r.chunk.section_title}]\n{r.chunk.raw_text[:300]}…"
-                    for i, r in enumerate(resp.source_chunks)
-                )
-                prompt_preview = f"""You are an expert underwriter and claims auditor...
+        # ── RISK SCORE PANEL (left) ─────────────────────────────────────
+        with left_col:
+            from src.search_index import RISK_KEYWORDS
+            # Aggregate risk across all result chunks
+            all_risk_kws: dict = {}
+            max_score = 0
+            for r in resp.source_chunks:
+                ri = r.risk_info or {}
+                for kw in ri.get("matched_keywords", []):
+                    weight = RISK_KEYWORDS.get(kw, 1)
+                    all_risk_kws[kw] = max(all_risk_kws.get(kw, 0), weight)
+                max_score = max(max_score, ri.get("score", 0))
 
-CONTEXT:
----
-{context_preview}
----
+            # Overall aggregate level
+            agg_level = ("HIGH" if max_score >= 8 else
+                         "MEDIUM" if max_score >= 4 else "LOW")
+            bar_pct   = min(100, int(max_score / 20 * 100))
 
-USER QUERY: {resp.query}
+            # Build keyword tags html
+            kw_html = ""
+            for kw, weight in sorted(all_risk_kws.items(),
+                                     key=lambda x: -x[1]):
+                cls = ("rkw-high" if weight >= 3 else
+                       "rkw-medium" if weight == 2 else "rkw-low")
+                kw_html += f'<span class="risk-kw-tag {cls}">{kw}</span>'
 
-ANSWER (cite sections explicitly):"""
-                st.code(prompt_preview, language="text")
+            st.markdown(f"""
+<div class="risk-panel">
+  <div class="risk-panel-title">P&amp;C Risk Signals</div>
+  <div class="risk-score-row">
+    <div>
+      <div style="font-size:11px;color:#9C8E7A;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">
+        Aggregate risk
+      </div>
+      <div class="risk-score-big {agg_level}">{max_score}</div>
+    </div>
+    <div style="flex:1">
+      <div style="font-size:11px;color:#9C8E7A;margin-bottom:4px">
+        Level: <strong style="color:#1C2B3A">{agg_level}</strong>
+        &nbsp;·&nbsp; {len(all_risk_kws)} signal(s) detected
+      </div>
+      <div class="risk-bar-wrap">
+        <div class="risk-bar-fill {agg_level}" style="width:{bar_pct}%"></div>
+      </div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:#9C8E7A;margin-bottom:6px;font-weight:600">
+    KEYWORD SIGNALS DETECTED
+  </div>
+  <div class="risk-kw-grid">
+    {kw_html if kw_html else '<span style="color:#B8A898;font-size:12px">No risk signals detected</span>'}
+  </div>
+</div>""", unsafe_allow_html=True)
+
+        # ── GUARDRAIL DETAIL PANEL (right) ─────────────────────────────
+        with right_col:
+            gd = resp.guardrail_detail or {}
+            grd_cls   = ("grd-pass" if resp.guardrail_passed else
+                         "grd-warn" if gd.get("warnings_count",0) <= 1 else "grd-fail")
+            gs_pct    = int(gs * 100)
+            gs_bar    = ("grd-bar-high" if gs >= 0.7 else
+                         "grd-bar-medium" if gs >= 0.4 else "grd-bar-low")
+            gs_cls    = ("pass" if gs >= 0.7 else "warn" if gs >= 0.4 else "fail")
+            nref      = "⚠ YES" if gd.get("no_reference") else "✓ Not triggered"
+            nref_cls  = "fail" if gd.get("no_reference") else "pass"
+            hal_cls   = "fail" if gd.get("hallucination_flag") else "pass"
+            hal_val   = "⚠ Detected" if gd.get("hallucination_flag") else "✓ Clear"
+            unverified= gd.get("num_unverified", 0)
+            unver_cls = "fail" if unverified > 0 else "pass"
+            unver_val = (f"⚠ {unverified} figure(s)" if unverified > 0
+                         else "✓ All verified")
+            verified  = gd.get("verified_figures", [])
+            ver_html  = (", ".join(f"<code>{v}</code>" for v in verified[:4])
+                         if verified else "—")
+            warn_html = ""
+            for w in resp.guardrail_warnings:
+                warn_html += f'<div style="font-size:12px;color:#92400E;margin-top:6px;padding:6px 10px;background:#FFFBEB;border-radius:6px">• {w}</div>'
+
+            st.markdown(f"""
+<div class="grd-panel {grd_cls}">
+  <div class="risk-panel-title">Guardrail &amp; Quality Scores</div>
+  <div class="grd-row">
+    <span class="grd-label">Groundedness score</span>
+    <span>
+      <span class="grd-value {gs_cls}">{gs_pct}%</span>
+      <span class="grd-bar-wrap">
+        <span class="grd-bar-fill {gs_bar}" style="display:block;width:{gs_pct}%"></span>
+      </span>
+    </span>
+  </div>
+  <div class="grd-row">
+    <span class="grd-label">Unverified figures</span>
+    <span class="grd-value {unver_cls}">{unver_val}</span>
+  </div>
+  <div class="grd-row">
+    <span class="grd-label">Verified figures</span>
+    <span class="grd-value" style="font-size:12px">{ver_html}</span>
+  </div>
+  <div class="grd-row">
+    <span class="grd-label">No reference found</span>
+    <span class="grd-value {nref_cls}">{nref}</span>
+  </div>
+  <div class="grd-row">
+    <span class="grd-label">Hallucination flag</span>
+    <span class="grd-value {hal_cls}">{hal_val}</span>
+  </div>
+  <div class="grd-row">
+    <span class="grd-label">Total warnings</span>
+    <span class="grd-value {'fail' if resp.guardrail_warnings else 'pass'}">
+      {len(resp.guardrail_warnings)} warning(s)
+    </span>
+  </div>
+  {warn_html}
+</div>""", unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════════════════════
-# TAB 2 — QUERY HISTORY
-# ══════════════════════════════════════════════════════════════════════════
-with tab_history:
-    st.markdown("### 📜 Query History")
-    history = st.session_state.query_history
-
-    if not history:
-        st.info("No queries yet. Run a search in the Search tab.")
+# ─────────────────────────────────────────────────────────
+# HISTORY TAB
+# ─────────────────────────────────────────────────────────
+with tab_hist:
+    st.markdown('<div class="section-label">Query history</div>', unsafe_allow_html=True)
+    hist = st.session_state.query_history
+    if not hist:
+        st.info("No queries yet — run a search first.")
     else:
-        if st.button("🗑 Clear history"):
-            st.session_state.query_history = []
-            st.rerun()
-
-        for i, item in enumerate(history):
-            r = item["response"]
-            n = len(r.source_chunks)
-            top_doc  = r.source_chunks[0].chunk.doc_name if n else "—"
-            top_sec  = r.source_chunks[0].chunk.section_title[:35] if n else "—"
-            gs = r.groundedness_score
-
-            with st.expander(f"**Q{len(history)-i}** — {item['query'][:70]}  ·  {item['ms']:.0f}ms  ·  {n} results", expanded=i == 0):
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Results", n)
-                col2.metric("Groundedness", f"{gs:.1%}")
-                col3.metric("Guardrail", "✅ Pass" if r.guardrail_passed else "⚠️ Warn")
-
-                st.markdown(f"**Top result:** {top_doc} · {top_sec}")
+        if st.button("Clear all history"):
+            st.session_state.query_history = []; st.rerun()
+        for i, item in enumerate(hist):
+            r  = item["response"]
+            n  = len(r.source_chunks)
+            td = (st.session_state.index.get_display_name(r.source_chunks[0].chunk)
+                  if n else "—")
+            with st.expander(
+                    f"Q{len(hist)-i} · {item['query'][:62]} · {item['ms']:.0f} ms"):
+                ca, cb, cc = st.columns(3)
+                ca.metric("Results", n)
+                cb.metric("Groundedness", f"{r.groundedness_score:.0%}")
+                cc.metric("Guardrail", "Passed" if r.guardrail_passed else "Warning")
+                st.markdown(f"**Top result:** {td}")
                 if n:
-                    r0 = r.source_chunks[0]
-                    st.markdown(f"> {r0.chunk.raw_text[:350].replace(chr(10), ' ')}…")
-
-                if st.button("Re-run this query", key=f"rerun_{i}"):
-                    st.session_state["prefill_query"] = item["query"]
-                    st.rerun()
+                    st.markdown(
+                        f"> {r.source_chunks[0].chunk.raw_text[:280].replace(chr(10),' ')}…")
+                if st.button("Re-run", key=f"rerun_{i}"):
+                    st.session_state["prefill_query"] = item["query"]; st.rerun()
 
 
-# ══════════════════════════════════════════════════════════════════════════
-# TAB 3 — EVALUATION
-# ══════════════════════════════════════════════════════════════════════════
-#with tab_eval:
-#    st.markdown("### 📊 Search Quality Evaluation")
-#    st.markdown("Runs the built-in labelled query set (8 queries with ground-truth sections) and reports nDCG, MRR, Precision and Recall.")
-#
-#    col_run, col_info = st.columns([2, 3])
-#    with col_run:
-#        run_eval = st.button("▶ Run Evaluation Suite", type="primary", use_container_width=True)
-#
-#    with col_info:
-#        st.markdown("""
-#<div class="info-box info-blue">
-#Evaluation uses the <code>get_sample_queries()</code> function from <code>src/sample_docs.py</code>.
-#Add your own labelled queries there for custom evaluation.
-#</div>
-#""", unsafe_allow_html=True)
-#
-#    if run_eval:
-#        eval_set = get_sample_queries()
-#        with st.spinner(f"Running {len(eval_set)} evaluation queries…"):
-#            results = SearchEvaluator.evaluate(st.session_state.engine, eval_set)
-#        st.session_state.eval_results = results
-#        st.success("Evaluation complete!")
-#
-#    if st.session_state.eval_results:
-#        ev = st.session_state.eval_results
-#        st.markdown("#### Summary Metrics")
-#
-#        targets = {"precision_at_k": 0.85, "recall_at_k": 0.80, "mrr": 0.88, "ndcg_at_k": 0.82}
-#        labels  = {"precision_at_k": "Precision@k", "recall_at_k": "Recall@k", "mrr": "MRR", "ndcg_at_k": "nDCG@k"}
-#        descs   = {
-#            "precision_at_k": "Are all top-k results relevant?",
-#            "recall_at_k":    "Were all relevant sections found?",
-#            "mrr":            "Is the best result near the top?",
-#            "ndcg_at_k":      "Overall ranked retrieval quality",
-#        }
-#
-#        cols = st.columns(4)
-#        for i, (key, label) in enumerate(labels.items()):
-#            score  = ev[key]
-#            target = targets[key]
-#            delta  = score - target
-#            icon   = "✅" if score >= target else "⚠️"
-#            cols[i].metric(
-#                label=f"{icon} {label}",
-#                value=f"{score:.4f}",
-#                delta=f"{delta:+.4f} vs target {target}",
-#                delta_color="normal",
-#                help=descs[key],
-#            )
-#
-#        st.markdown("#### Per-Query Breakdown")
-#        import pandas as pd
-#        pq = ev.get("per_query", [])
-#        df = pd.DataFrame(pq)
-#        df.columns = [c.replace("_", " ").title() for c in df.columns]
-#        st.dataframe(df, use_container_width=True, hide_index=True)
-#
-#        st.markdown("""
-#<div class="info-box info-orange">
-#<strong>🔁 Improve scores:</strong> Switch from TF-IDF to <code>BAAI/bge-large-en-v1.5</code> neural embeddings
-#for significant accuracy gains (expected nDCG ~0.87 vs current ~0.58 baseline).
-#See <code>src/search_index.py</code> — replace <code>TFIDFEmbedder()</code> with <code>SentenceTransformerEmbedder(...)</code>.
-#</div>
-#""", unsafe_allow_html=True)
+# ── EVALUATION TAB COMMENTED OUT ─────────────────────────────────────────
+# Uncomment the eval tab in the st.tabs() call above to re-enable
 
 
-# ══════════════════════════════════════════════════════════════════════════
-# TAB 4 — INDEXED DOCUMENTS
-# ══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────
+# DOCUMENTS TAB
+# ─────────────────────────────────────────────────────────
 with tab_docs:
-    st.markdown("### 📁 Indexed Document Corpus")
-
     docs = st.session_state.indexed_docs
+    st.markdown('<div class="section-label">Indexed corpus</div>', unsafe_allow_html=True)
     if not docs:
         st.info("No documents indexed yet.")
     else:
-        total_chunks = sum(d["chunks"] for d in docs)
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Documents", len(docs))
-        c2.metric("Child chunks", total_chunks)
-        c3.metric("Parent sections", st.session_state.index.stats()["total_parent_sections"])
-
-        st.markdown("---")
+        tc = sum(d["chunks"] for d in docs)
+        da, db, dc = st.columns(3, gap="medium")
+        da.metric("Documents", len(docs))
+        db.metric("Search chunks", tc)
+        dc.metric("Sections", st.session_state.index.stats()["total_parent_sections"])
+        st.markdown("")
         for doc in docs:
-            src_badge = "📤 Uploaded" if doc["source"] == "upload" else "🎛 Demo"
-            lob_color = {
-                "Reinsurance": "#6b3a9e",
-                "Property & Casualty": "#1b3a6b",
-                "Compliance": "#7a3d00",
-            }.get(doc["lob"], "#333")
-
+            src = "Uploaded" if doc["source"]=="upload" else "Demo"
+            lc  = lob_tag_cls(doc["lob"])
             st.markdown(f"""
-<div class="result-card">
-  <div class="result-header">
-    <div>
-      <div class="doc-name">📄 {doc['name']}</div>
-      <div class="section" style="color:{lob_color}">
-        {doc['lob']} &nbsp;·&nbsp; {doc['category']}
-      </div>
-    </div>
-    <div style="text-align:right">
-      <span class="score-badge">{doc['chunks']} chunks</span><br>
-      <small style="color:#888;font-size:11px;margin-top:4px;display:block">{src_badge}</small>
+<div class="doc-item">
+  <div>
+    <div class="doc-name">📄 &nbsp;{doc['display_name']}</div>
+    <div class="doc-meta">
+      <span class="lob-tag {lc}">{doc['lob']}</span>
+      &nbsp; {doc['category']} &nbsp;·&nbsp; {src}
     </div>
   </div>
-</div>
-""", unsafe_allow_html=True)
-
-        st.markdown("---")
-        st.markdown("#### 📝 Add a Custom Query to Evaluation")
-        with st.expander("Custom evaluation query builder"):
-            new_query = st.text_input("Query text", placeholder="What is the flood deductible?")
-            new_sections = st.text_input("Relevant sections (comma-separated)",
-                                         placeholder="SECTION 2: DEFINITIONS, SECTION 5: CONDITIONS")
-            if st.button("Add to eval set") and new_query:
-                if "custom_eval" not in st.session_state:
-                    st.session_state.custom_eval = []
-                secs = [s.strip() for s in new_sections.split(",") if s.strip()]
-                st.session_state.custom_eval.append({"query": new_query, "relevant_sections": secs})
-                st.success(f"Added: {new_query}")
-
-            if st.session_state.get("custom_eval"):
-                st.markdown("**Custom queries added:**")
-                for item in st.session_state.custom_eval:
-                    st.caption(f"• {item['query']} → {item['relevant_sections']}")
+  <div>
+    <div class="doc-count">{doc['chunks']}</div>
+    <div class="doc-count-label">chunks</div>
+  </div>
+</div>""", unsafe_allow_html=True)
