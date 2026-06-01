@@ -1,53 +1,17 @@
-# ================================
-# Core Search & ML
-# ================================
-rank-bm25==0.2.2
-scikit-learn==1.5.1
-numpy==1.26.4
-pandas==2.2.2
-
-# ================================
-# PDF Parsing
-# ================================
-pymupdf==1.24.9
-pdfplumber==0.11.4
-
-# ================================
-# Vector Databases
-# ================================
-qdrant-client==1.11.1
-
-# ChromaDB stack (stable combo)
-chromadb==0.4.24
-protobuf==3.20.3
-
-# OpenTelemetry compatibility
-opentelemetry-api==1.24.0
-opentelemetry-sdk==1.24.0
-
-# ================================
-# Embeddings / Transformers
-# ================================
-sentence-transformers==3.0.1
-transformers==4.44.2
-torch==2.4.1
-
-# ================================
-# LLM Providers
-# ================================
-groq==0.11.0
-openai==1.43.0
-
-# ================================
-# Streamlit UI
-# ================================
-streamlit==1.38.0
-
-# ================================
-# Utilities
-# ================================
-tqdm==4.66.5
-requests==2.32.3
-colorama==0.4.6
-rich==13.8.0
-tabulate==0.9.0
+sentence-transformers>=2.7.0
+rank-bm25>=0.2.2
+qdrant-client>=1.9.0
+pymupdf>=1.24.0
+pdfplumber>=0.11.0
+numpy>=1.26.0
+pandas>=2.0.0
+tabulate>=0.9.0
+tqdm>=4.66.0
+requests>=2.31.0
+colorama>=0.4.6
+rich>=13.0.0
+torch>=2.0.0
+transformers>=4.40.0
+streamlit
+torchvision
+groq
