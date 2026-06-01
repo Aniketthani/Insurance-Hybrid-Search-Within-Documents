@@ -33,27 +33,24 @@ NUMERIC_RE = re.compile(
     re.IGNORECASE
 )
 
-SYSTEM_PROMPT = """You are an expert insurance analyst. Answer ONLY from the CONTEXT below.
+SYSTEM_PROMPT = """You are an expert underwriter and claims auditor specializing in P&C and Reinsurance.
 
 CONTEXT:
 ---
 {context}
 ---
-Key figures: {attachment_info}
+Attachment Point: {attachment_info}
 
-RULES (follow strictly):
-1. Use ONLY the CONTEXT above. No outside knowledge.
-2. If the topic is NOT mentioned anywhere in the context, respond EXACTLY:
-   "⚠ NO REFERENCE FOUND: The query topic is not present in the indexed documents."
-3. If partially mentioned but incomplete, say what IS found, then add:
-   "Note: Complete information on this topic was not found in the indexed documents."
-4. Cite the exact section or table row (e.g. "Section 3 — Exclusions").
-5. Quote exact figures (premium amounts, percentages, dates).
-6. Be concise — 3 to 5 sentences maximum.
+INSTRUCTIONS:
+1. Answer the user query using ONLY the provided CONTEXT above.
+2. If the answer cannot be verified with absolute certainty from the CONTEXT, state clearly: "This cannot be confirmed from the provided documents."
+3. Do not assume or extrapolate terms based on general industry standards. Cite the exact section or clause you are referencing.
+4. When referencing monetary limits, deductibles, or attachment points, quote the EXACT figures from the CONTEXT.
+5. If multiple sections are relevant, cite each one.
 
 USER QUERY: {query}
 
-ANSWER:"""
+ANSWER (cite sections explicitly):"""
 
 
 @dataclass
@@ -66,8 +63,6 @@ class RAGResponse:
     guardrail_warnings: List[str]
     groundedness_score: float
     numerical_audit: Dict
-    no_reference_found: bool = False
-    guardrail_detail: Dict = None
 
 
 class InsuranceRAGEngine:
@@ -158,31 +153,6 @@ class InsuranceRAGEngine:
         groundedness = self._groundedness_score(answer, results)
         passed = len(warnings) == 0
 
-        # Detect "no reference found" responses
-        no_ref_phrases = [
-            "no reference found",
-            "not present in the indexed",
-            "not found in the indexed",
-            "cannot be confirmed from the provided",
-            "no relevant documents found",
-        ]
-        no_reference = any(p in answer.lower() for p in no_ref_phrases)
-
-        # Guardrail detail dict for UI display
-        guardrail_detail = {
-            "groundedness_score":  groundedness,
-            "groundedness_level":  ("high" if groundedness >= 0.70 else
-                                    "medium" if groundedness >= 0.40 else "low"),
-            "num_unverified":      len(num_audit.get("unverified", [])),
-            "unverified_figures":  num_audit.get("unverified", []),
-            "verified_figures":    [n for n in num_audit.get("answer_numbers", [])
-                                    if n not in num_audit.get("unverified", [])],
-            "hallucination_flag":  any("hallucination" in w for w in warnings),
-            "coverage_opinion_flag": any("opinion" in w for w in warnings),
-            "no_reference":        no_reference,
-            "warnings_count":      len(warnings),
-        }
-
         return RAGResponse(
             query=query,
             answer=answer,
@@ -192,8 +162,6 @@ class InsuranceRAGEngine:
             guardrail_warnings=warnings,
             groundedness_score=groundedness,
             numerical_audit=num_audit,
-            no_reference_found=no_reference,
-            guardrail_detail=guardrail_detail,
         )
 
     # ------------------------------------------------------------------ #
@@ -418,7 +386,7 @@ class GroqLLM:
         api_key:     Optional[str] = None,
         model:       str = DEFAULT_MODEL,
         temperature: float = 0.0,    # 0 = deterministic — required for insurance accuracy
-        max_tokens:  int   = 512,   # 512 → faster, concise answers
+        max_tokens:  int   = 1024,
     ):
         try:
             from groq import Groq
@@ -556,127 +524,6 @@ def build_groq_llm(
     Reads GROQ_API_KEY from environment if api_key not passed.
     """
     return GroqLLM(api_key=api_key, model=model)
-
-
-# ─────────────────────────────────────────────────────────────────────────
-# OPENAI LLM INTEGRATION
-# ─────────────────────────────────────────────────────────────────────────
-
-OPENAI_MODELS = {
-    "gpt-4o":              "GPT-4o — best quality, multimodal",
-    "gpt-4o-mini":         "GPT-4o Mini — fast & cost-effective",
-    "gpt-4-turbo":         "GPT-4 Turbo — 128k context",
-    "gpt-3.5-turbo":       "GPT-3.5 Turbo — fastest, lowest cost",
-}
-
-# OpenAI context budgets (tokens → chars, conservative)
-OPENAI_CONTEXT_BUDGET = {
-    "gpt-4o":        int(100_000 * 3.8),
-    "gpt-4o-mini":   int(100_000 * 3.8),
-    "gpt-4-turbo":   int(120_000 * 3.8),
-    "gpt-3.5-turbo": int(14_000  * 3.8),
-}
-
-
-class OpenAILLM:
-    """
-    OpenAI LLM integration for the Insurance RAG engine.
-    Drop-in compatible with GroqLLM — same __call__ interface.
-
-    Setup:
-        1. Get an API key at https://platform.openai.com/api-keys
-        2. Set env var: OPENAI_API_KEY=sk-...
-           OR pass api_key= directly.
-    """
-
-    DEFAULT_MODEL = "gpt-4o-mini"
-
-    def __init__(self, api_key=None, model=DEFAULT_MODEL,
-                 temperature=0.0, max_tokens=1024):
-        try:
-            from openai import OpenAI as _OpenAI
-        except ImportError:
-            raise ImportError("openai package not installed. Run: pip install openai")
-
-        resolved_key = api_key or os.environ.get("OPENAI_API_KEY")
-        if not resolved_key:
-            raise ValueError(
-                "No OpenAI API key provided. Pass api_key= or set OPENAI_API_KEY.")
-
-        self.client         = _OpenAI(api_key=resolved_key)
-        self.model          = model
-        self.temperature    = temperature
-        self.max_tokens     = max_tokens
-        self.name           = f"OpenAI / {model}"
-        self.context_budget = OPENAI_CONTEXT_BUDGET.get(model, int(14_000 * 3.8))
-
-        console.print(f"[green]✓ OpenAI LLM ready: {self.name}  "
-                      f"| context budget: {self.context_budget:,} chars[/]")
-
-    def _truncate_prompt(self, prompt: str) -> tuple:
-        """Same truncation logic as GroqLLM."""
-        if len(prompt) <= self.context_budget:
-            return prompt, False, 0
-        import re as _re
-        sources_start = prompt.find("[Source 1:")
-        tail_match    = _re.search(r"\nUSER QUERY:", prompt)
-        tail_start    = tail_match.start() if tail_match else len(prompt)
-        if sources_start == -1 or sources_start >= tail_start:
-            budget = self.context_budget - 200
-            return (prompt[:budget] + "\n[...truncated...]\n" + prompt[tail_start:],
-                    True, len(prompt) - self.context_budget)
-        preamble      = prompt[:sources_start]
-        tail          = prompt[tail_start:]
-        sources_block = prompt[sources_start:tail_start]
-        sections      = _re.split(r"\n\n---\n\n", sources_block)
-        available     = self.context_budget - len(preamble) - len(tail) - 100
-        if available <= 0:
-            return preamble + "[Context omitted]\n" + tail, True, len(sources_block)
-        n = len(sections)
-        budgets = ([available] if n==1 else
-                   [int(available*0.40)] + [(available - int(available*0.40))//max(n-1,1)]*(n-1))
-        trunc = []
-        removed = 0
-        for sec, bud in zip(sections, budgets):
-            if len(sec) <= bud:
-                trunc.append(sec)
-            else:
-                le = sec.find("\n")
-                lbl = sec[:le+1] if le!=-1 else ""
-                body = sec[le+1:] if le!=-1 else sec
-                bb = bud - len(lbl) - 60
-                trunc.append(lbl + (body[:bb]+"\n[...truncated...]" if bb>100
-                                    else "[...truncated...]"))
-                removed += len(sec) - bud
-        return preamble + "\n\n---\n\n".join(trunc) + tail, True, removed
-
-    def __call__(self, prompt: str) -> str:
-        prompt, was_trunc, removed = self._truncate_prompt(prompt)
-        if was_trunc:
-            console.print(f"[yellow]  Prompt truncated: {removed:,} chars (OpenAI {self.model})[/]")
-        try:
-            resp = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
-            return resp.choices[0].message.content.strip()
-        except Exception as e:
-            console.print(f"[red]OpenAI API error: {e}[/]")
-            return f"[OpenAI API error: {e}]"
-
-    def test_connection(self) -> bool:
-        try:
-            self("Say OK")
-            return True
-        except Exception:
-            return False
-
-
-def build_openai_llm(api_key=None, model=OpenAILLM.DEFAULT_MODEL) -> OpenAILLM:
-    return OpenAILLM(api_key=api_key, model=model)
-
 
 
 # ------------------------------------------------------------------ #

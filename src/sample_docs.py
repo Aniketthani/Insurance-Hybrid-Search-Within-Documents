@@ -1,307 +1,248 @@
 """
-Life Insurance sample documents for demo — v2
-Covers: Term Policy, ULIP, Health Rider, ACORD COI, Premium Receipt
+Sample Insurance Documents
+===========================
+Realistic P&C and Reinsurance text for demo/testing.
+Covers: Policy wording, Reinsurance treaty slip, Exclusions schedule.
 """
 
 SAMPLE_DOCS = {
-    "life_term_policy": """
-# LIFE INSURANCE POLICY DOCUMENT
-Policy Number: LIP-2024-TERM-00892
-Policy Type: Pure Term Insurance Plan
-Insured (Life Assured): Rajesh Kumar Sharma
-Date of Birth: 15 March 1985
-Policy Term: 30 Years
-Premium Payment Term: 30 Years
-Sum Assured: INR 1,00,00,000 (One Crore)
-Annual Premium: INR 12,450
-Policy Commencement Date: 01 January 2024
-Policy Maturity Date: 31 December 2053
+    "property_policy": """
+# COMMERCIAL PROPERTY INSURANCE POLICY
+Policy Number: CPP-2024-MH-00892
+Insured: Hamilton Logistics Pvt Ltd
+Line of Business: Property & Casualty
+Effective Date: 01 January 2024
+Expiry Date: 31 December 2024
 
-## SECTION 1: DEFINITIONS
+## SECTION 1: DECLARATIONS
 
-1.1 Sum Assured means the guaranteed amount payable on death of the Life Assured during the policy term, being INR 1,00,00,000 (Rupees One Crore only).
+The insurer agrees to provide coverage as described herein subject to the terms, conditions, and exclusions set forth in this policy.
 
-1.2 Nominee means the person nominated by the Policyholder to receive the death benefit. Current Nominee: Priya Sharma (Spouse), Relationship: Wife.
-
-1.3 Premium means the amount payable by the Policyholder to keep this policy in force. Annual Premium: INR 12,450 payable on 1st January each year.
-
-1.4 Grace Period means a period of 30 days from the premium due date within which the premium may be paid without the policy lapsing.
-
-1.5 Revival Period means the period of 5 years from the date of first unpaid premium during which the lapsed policy may be revived.
-
-## SECTION 2: BENEFITS
-
-2.1 Death Benefit
-On death of the Life Assured during the Policy Term, the Sum Assured of INR 1,00,00,000 shall be payable to the Nominee, provided the policy is in force on the date of death.
-
-2.2 Survival Benefit
-This is a Pure Term Plan. No survival benefit or maturity benefit is payable if the Life Assured survives the full policy term.
-
-2.3 Accidental Death Benefit Rider (Optional)
-If the Accidental Death Benefit Rider is attached, an additional INR 50,00,000 shall be payable on accidental death, over and above the base Sum Assured.
-
-## SECTION 3: EXCLUSIONS
-
-3.1 The death benefit shall NOT be payable in the following circumstances:
-(a) Suicide within 12 months of policy commencement or revival
-(b) Death due to participation in adventure sports or hazardous activities not declared at proposal
-(c) Death due to war, terrorism, or civil commotion
-(d) Death under the influence of alcohol or controlled substances
-(e) Pre-existing conditions not disclosed at the time of proposal
-
-3.2 Non-Disclosure Exclusion
-If the Policyholder has made any material misrepresentation or non-disclosure of material facts in the Proposal Form, the Company reserves the right to repudiate the claim.
-
-## SECTION 4: PREMIUM CONDITIONS
-
-| Premium Mode | Amount (INR) | Loading |
-|---|---|---|
-| Annual | 12,450 | Nil |
-| Semi-Annual | 6,472 | 3.5% |
-| Quarterly | 3,300 | 5.9% |
-| Monthly | 1,120 | 7.2% |
-
-4.1 Medical Expenses for Organ Donor
-Medical expenses incurred for the extraction of the required organ from the organ donor are covered under this policy subject to the overall Sum Assured limit. This benefit applies when organ transplant is necessitated due to a covered critical illness.
-
-4.2 Premium Waiver on Critical Illness
-All future premiums are waived if the Life Assured is diagnosed with any of the 36 listed critical illnesses, and the policy continues in full force.
-
-## SECTION 5: LAPSE AND REVIVAL
-
-5.1 Lapse
-If the premium is not paid within the grace period of 30 days, the policy lapses and all benefits cease.
-
-5.2 Revival
-A lapsed policy may be revived within 5 years of first unpaid premium by:
-(a) Payment of all arrear premiums with interest at 9% per annum
-(b) Submission of satisfactory evidence of good health
-(c) Payment of revival charges as applicable
-
-## SECTION 6: FREE LOOK PERIOD
-
-The Policyholder may return this policy within 30 days of receipt (Free Look Period) if not satisfied with the terms. The Company shall refund the premium paid after deducting stamp duty and medical examination charges.
-""",
-
-    "ulip_policy": """
-# UNIT LINKED INSURANCE PLAN (ULIP)
-Policy Number: ULIP-2024-MH-05521
-Product Name: Wealth Plus Growth Plan
-Life Assured: Ananya Mehta
-Sum Assured: INR 50,00,000
-Annual Premium: INR 1,00,000
-Policy Term: 20 Years
-Lock-in Period: 5 Years
-
-## FUND OPTIONS
-
-| Fund Name | Risk Profile | Current NAV (per unit) | Asset Allocation |
+| Coverage | Sum Insured | Premium Rate | Annual Premium |
 |---|---|---|---|
-| Equity Growth Fund | High | INR 45.23 | 80% Equity, 20% Debt |
-| Balanced Advantage Fund | Medium | INR 28.67 | 50% Equity, 50% Debt |
-| Secure Bond Fund | Low | INR 18.12 | 100% Debt |
-| Liquid Fund | Very Low | INR 12.05 | Money Market |
+| Building | $10,000,000 | 0.15% | $15,000 |
+| Contents | $5,000,000 | 0.20% | $10,000 |
+| Business Interruption | $2,000,000 | 0.25% | $5,000 |
+| Total | $17,000,000 | — | $30,000 |
 
-## SECTION 1: UNIT ALLOCATION
+## SECTION 2: DEFINITIONS
 
-1.1 Premium Allocation Charges
+2.1 Insured Property means the building, fixtures, fittings, plant, machinery, and contents described in the Schedule, situated at the premises specified therein.
 
-| Policy Year | Allocation Charge |
+2.2 Occurrence means any one event or series of events arising from a single originating cause.
+
+2.3 Deductible means the amount to be borne by the Insured in respect of each and every loss occurrence, as specified in Section 5 of this Policy. The deductible applicable to flood and earthquake peril is $500,000.
+
+2.4 Sum Insured means the maximum liability of the Insurer in respect of any one occurrence, as stated in the Declarations.
+
+## SECTION 3: COVERAGE
+
+3.1 All Risks Coverage
+This Policy covers all risks of direct physical loss or damage to the Insured Property from any cause whatsoever, except as specifically excluded under Section 4.
+
+3.2 Named Perils — Extended Coverage
+The following named perils are expressly covered under this Policy:
+- Fire, lightning, and explosion
+- Storm, tempest, windstorm, and cyclone
+- Flood and inundation (subject to $500,000 deductible)
+- Earthquake and volcanic eruption (subject to $500,000 deductible)
+- Impact by aircraft, vehicles, or vessels
+- Malicious damage and vandalism
+
+3.3 Business Interruption
+In the event of an insured loss causing an interruption to the business, the Insurer shall indemnify the Insured for:
+(a) Net profit that would have been earned
+(b) Standing charges and fixed expenses continuing during the indemnity period
+Maximum indemnity period: 12 months
+Maximum liability: $2,000,000
+
+## SECTION 4: EXCLUSIONS
+
+4.1 This Policy does not cover loss, damage, or liability directly or indirectly caused by, contributed to by, resulting from, or in connection with:
+
+(a) War, invasion, acts of foreign enemies, hostilities, civil war, rebellion, terrorism
+(b) Nuclear, radiological, chemical, or biological contamination
+(c) Cyber attack, hacking, or malicious code causing physical damage (see Cyber Exclusion Clause CL380)
+(d) Gradual deterioration, wear and tear, inherent vice, or latent defect
+(e) Loss of market, delay, loss of use, or consequential loss except as provided under Section 3.3
+(f) Wilful act or gross negligence of the Insured
+
+4.2 Cyber Exclusion — CL380
+Notwithstanding any provision to the contrary, this Policy excludes any loss, damage, liability, cost, or expense of whatsoever nature directly or indirectly caused by, contributed to by, resulting from, or arising out of or in connection with any cyber attack or act of cyber terrorism. This exclusion applies regardless of any other cause or event contributing concurrently or in any other sequence to the loss.
+
+## SECTION 5: CONDITIONS
+
+5.1 Deductible Schedule
+| Peril | Deductible |
 |---|---|
-| Year 1 | 5% of premium |
-| Year 2–5 | 4% of premium |
-| Year 6 onwards | Nil |
+| All perils (general) | $50,000 |
+| Flood / Inundation | $500,000 |
+| Earthquake | $500,000 |
+| Windstorm / Cyclone | $100,000 |
 
-1.2 Fund Management Charges: 1.35% per annum on fund value.
+5.2 Basis of Settlement
+In the event of loss or damage, the basis of settlement shall be:
+(a) Buildings: Reinstatement value (cost of rebuilding to the same specification)
+(b) Contents: Replacement value (cost of replacement with new item of like kind)
+(c) Machinery: Replacement value less depreciation not exceeding 50%
 
-1.3 Mortality Charges: Deducted monthly based on Sum at Risk (Sum Assured minus Fund Value).
+5.3 Claims Notification
+The Insured shall notify the Insurer within 7 days of discovery of any loss or damage likely to give rise to a claim. Failure to notify within 30 days shall render this policy void with respect to such claim.
 
-## SECTION 2: BENEFITS
-
-2.1 Death Benefit
-Higher of:
-(a) Sum Assured = INR 50,00,000, OR
-(b) Fund Value at date of death
-Whichever is higher shall be paid to the Nominee.
-
-2.2 Maturity Benefit
-On survival to maturity, the Fund Value (NAV × number of units held) is paid.
-
-2.3 Partial Withdrawal
-Permitted after the 5-year lock-in period. Maximum 25% of Fund Value per year. Minimum balance of INR 5,000 must be maintained.
-
-## SECTION 3: SURRENDER VALUE
-
-| Year of Surrender | Discontinuance Charge |
-|---|---|
-| Year 1 | INR 6,000 or 6% of AP (lower) |
-| Year 2 | INR 5,000 or 4% of AP (lower) |
-| Year 3 | INR 4,000 or 3% of AP (lower) |
-| Year 4 | INR 2,000 or 2% of AP (lower) |
-| Year 5+ | Nil |
-
-3.1 Surrender before lock-in: Fund value after discontinuance charges moved to Discontinued Policy Fund earning 4% p.a. Paid at end of lock-in.
-
-## SECTION 4: MEDICAL EXPENSES
-
-4.1 Critical Illness Benefit
-On diagnosis of 36 listed critical illnesses, INR 25,00,000 (50% of Sum Assured) shall be paid as a lump sum. Policy continues for remaining Sum Assured.
-
-4.2 Hospital Cash Benefit Rider
-INR 2,000 per day of hospitalisation (up to 60 days per year) if rider is opted. Medical expenses for organ extraction for organ donation surgery are covered up to INR 5,00,000 under the Health Plus rider.
+5.4 Co-Insurance Clause
+If the Sum Insured is less than the actual value of the Insured Property at the time of loss, the Insured shall be considered as being their own Insurer for the difference and shall bear a rateable proportion of any loss accordingly.
 """,
 
-    "health_rider": """
-# HEALTH PLUS RIDER — CERTIFICATE
-Rider Number: HPR-2024-00445
-Base Policy Number: LIP-2024-TERM-00892
-Rider Type: Critical Illness + Surgical Benefit Rider
-Sum Assured (Rider): INR 10,00,000
-Rider Premium: INR 2,850 per annum
-Rider Term: 20 Years
+    "reinsurance_treaty": """
+# REINSURANCE TREATY — PLACEMENT SLIP
+Treaty Reference: XL-PROP-2024-HAM-001
+Reinsured: Hamilton Re Ltd
+Line of Business: Property Excess of Loss
+Class: Non-Marine Property XL
 
-## COVERED CONDITIONS
+## TREATY STRUCTURE
 
-| Critical Illness | Benefit (% of Rider SA) | Waiting Period |
-|---|---|---|
-| Cancer (Life Threatening) | 100% | 90 days |
-| First Heart Attack | 100% | 90 days |
-| Stroke | 100% | 90 days |
-| Kidney Failure | 100% | 90 days |
-| Major Organ Transplant | 100% | 90 days |
-| Coronary Artery Disease | 75% | 90 days |
-| Multiple Sclerosis | 75% | 90 days |
-| Total Permanent Disability | 100% | Nil |
+| Layer | Limit | Attachment Point | Rate on Line |
+|---|---|---|---|
+| Layer 1 (Primary XL) | $5,000,000 xs $5,000,000 | $5,000,000 | 12.5% |
+| Layer 2 (Upper XL) | $10,000,000 xs $10,000,000 | $10,000,000 | 7.8% |
+| Layer 3 (Catastrophe) | $25,000,000 xs $20,000,000 | $20,000,000 | 4.2% |
 
-## SECTION 1: ORGAN DONOR BENEFIT
+## SECTION A: BUSINESS COVERED
 
-1.1 Medical expenses incurred for the extraction of the required organ from the organ donor, necessitated by a covered organ transplant, shall be reimbursed up to INR 2,50,000 under this rider.
+A.1 This Treaty covers the Reinsured's net retained liability in respect of all policies in force at inception and all policies issued or renewed during the period of this Treaty, covering:
+- Commercial and industrial property (all risks and named perils)
+- Business interruption and consequential loss as a consequence of property damage
+- Engineering and construction (on-risk policies only)
 
-1.2 The organ donor must be a living donor or deceased donor as certified by a registered hospital.
+A.2 Territorial scope: India, Bangladesh, Sri Lanka, and Nepal (IBSN Zone)
 
-1.3 Organ types covered: Kidney, Liver (partial), Heart, Lung, Pancreas, Cornea.
+## SECTION B: ATTACHMENT POINT AND LIMIT
 
-1.4 Expenses covered include: pre-operative investigations, surgical fees, hospitalisation, post-operative care up to 30 days.
+B.1 The Reinsurer agrees to indemnify the Reinsured for each and every loss occurrence in excess of the Attachment Point of $5,000,000 up to the Reinsurer's Limit of $5,000,000 per occurrence, making Layer 1 capacity of $5,000,000 xs $5,000,000.
 
-## SECTION 2: EXCLUSIONS
+B.2 The maximum liability of the Reinsurer shall not exceed $5,000,000 in respect of any one occurrence, nor $10,000,000 in the aggregate during the Treaty Period.
 
-2.1 This rider does not cover:
-(a) Cosmetic or aesthetic surgery
-(b) Dental treatment or surgery
-(c) Pregnancy-related expenses
-(d) Mental illness or psychiatric conditions
-(e) Self-inflicted injuries
-(f) Experimental treatments not approved by IRDA
+B.3 Annual Aggregate Deductible: $2,500,000 (applies to Layer 1 only)
 
-## SECTION 3: CLAIM PROCEDURE
+## SECTION C: EXCLUSIONS
 
-3.1 Claim Intimation: Within 30 days of diagnosis or surgery.
-3.2 Documents Required:
-- Duly filled claim form
-- Hospital discharge summary
-- All investigation reports
-- Treating doctor's certificate
-- KYC documents of claimant
+C.1 This Treaty excludes the following:
+(a) Nuclear incident, contamination, or radioactive fallout
+(b) War, terrorism, and political risks
+(c) Flood losses in excess of $15,000,000 per occurrence (catastrophic flood sublimit applies)
+(d) Cyber-induced physical damage losses (per LSW 3001 wording)
+(e) Losses arising from named windstorms where the Named Storm Event Deductible of $1,000,000 applies
+
+C.2 Cyber Exclusion — LSW 3001
+This Treaty is subject to the Cyber and Information Technology Exclusion Clause (LSW 3001). Losses directly or indirectly arising out of, or contributed to by, or resulting from Cyber Operations are excluded unless physical damage resulted independently of any Cyber Operation.
+
+## SECTION D: PREMIUM
+
+D.1 Minimum and Deposit Premium: $1,875,000 (payable in four quarterly instalments of $468,750)
+D.2 Adjustable Premium: Based on Reinsured's subject premium income. Rate: 1.875% on subject net earned premium income.
+D.3 Minimum Premium: $1,500,000 (75% of estimated deposit)
+
+## SECTION E: LOSS SETTLEMENT
+
+E.1 Claims Cooperation Clause: The Reinsured shall advise the Reinsurer of all losses likely to exceed $2,500,000 within 30 days of notification.
+
+E.2 Cash Loss Clause: The Reinsurer shall pay any claim within 30 days of receipt of a signed proof of loss, provided the loss exceeds $1,000,000.
+
+E.3 Follow the Fortunes: The Reinsurer agrees to follow the fortunes of the Reinsured in all matters pertaining to this Treaty, provided the Reinsured acts in good faith and in accordance with sound underwriting principles.
 """,
 
-    "acord_certificate": """
-# ACORD 25 — CERTIFICATE OF LIABILITY INSURANCE
-Certificate Number: COI-2024-MH-00123
-Date Issued: 15 January 2024
+    "claims_procedure": """
+# CLAIMS PROCEDURE MANUAL — PROPERTY & CASUALTY
+Document Type: Internal SOP
+Line of Business: Property & Casualty / Reinsurance
+Version: 4.2 | Effective: March 2024
 
-## INSURED INFORMATION
-Insured Name: Hamilton Logistics Pvt Ltd
-Address: 501 Business Park, Andheri East, Mumbai 400069
-Phone: +91 22 4567 8900
+## SECTION 1: FIRST NOTICE OF LOSS (FNOL)
 
-## INSURER INFORMATION
+1.1 Upon receipt of an FNOL, the Claims Handler shall:
+(a) Assign a unique claim reference number (format: CLM-YYYY-LOB-NNNNNN)
+(b) Acknowledge receipt to the Insured within 24 hours
+(c) Classify the loss by peril, estimated quantum, and coverage section
+(d) For estimated losses exceeding $500,000, appoint an Independent Loss Adjuster within 48 hours
 
-| Insurer | NAIC # | Policy Type | Policy Number | Effective | Expiry | Limit |
-|---|---|---|---|---|---|---|
-| National Insurance Co | IN-NIL | Commercial General Liability | CGL-2024-MH-892 | 01/01/2024 | 31/12/2024 | 1,00,00,000 |
-| United India Insurance | IN-UIL | Workers Compensation | WC-2024-MH-445 | 01/01/2024 | 31/12/2024 | Statutory |
-| Oriental Insurance | IN-OIL | Commercial Auto | CA-2024-MH-234 | 01/01/2024 | 31/12/2024 | 50,00,000 |
+1.2 FNOL Triage Matrix
+| Estimated Loss | SLA — First Response | SLA — Adjuster | Authority Level |
+|---|---|---|---|
+| Under $50,000 | 24 hours | Not required | Junior Handler |
+| $50,000 – $500,000 | 24 hours | 5 working days | Senior Handler |
+| $500,000 – $2,000,000 | 4 hours | 48 hours | Claims Manager |
+| Above $2,000,000 | 1 hour | 24 hours | Chief Claims Officer |
 
-## GENERAL LIABILITY COVERAGE
+## SECTION 2: INVESTIGATION AND ADJUSTMENT
 
-| Coverage Type | Each Occurrence | Aggregate |
-|---|---|---|
-| General Aggregate | — | INR 2,00,00,000 |
-| Products-Completed Operations | INR 1,00,00,000 | INR 2,00,00,000 |
-| Personal & Advertising Injury | INR 1,00,00,000 | — |
-| Each Occurrence | INR 1,00,00,000 | — |
-| Damage to Rented Premises | INR 10,00,000 | — |
-| Medical Expenses | INR 5,00,000 | — |
+2.1 The appointed Loss Adjuster shall submit a Preliminary Report within 10 working days of appointment, covering:
+- Cause and circumstances of loss
+- Policy coverage and applicable exclusions
+- Preliminary loss estimate
+- Reserve recommendation
 
-## CERTIFICATE HOLDER
-Hamilton Port Trust Authority
-Port Trust Building, Mumbai Port, Mumbai 400001
+2.2 For Business Interruption losses, the Loss Adjuster shall appoint a Forensic Accountant to review:
+- Historical financial statements (3 years minimum)
+- Order books and sales records
+- Fixed overhead schedule
+- Net profit calculation per policy definition
 
-This certificate is issued as a matter of information only and confers no rights upon the certificate holder. ACORD 25 (2016/03)
-""",
+2.3 Subrogation: Where the Insurer has paid a claim, the right of subrogation vests in the Insurer. The Claims Handler must flag all losses where a liable third party may be identified, within 30 days of loss settlement.
 
-    "premium_receipt": """
-# PREMIUM RECEIPT
-Receipt Number: PR-2024-892-JAN
-Policy Number: LIP-2024-TERM-00892
-Policyholder: Rajesh Kumar Sharma
-Date of Receipt: 05 January 2024
-Mode of Payment: NEFT/Online Transfer
-Transaction Reference: NEFT2024010500892
+## SECTION 3: RESERVING GUIDELINES
 
-## PAYMENT DETAILS
+3.1 Initial Reserve Philosophy: Reserves shall be set on a realistic best-estimate basis, not a worst-case basis.
 
-| Description | Amount (INR) |
-|---|---|
-| Basic Premium | 12,450.00 |
-| Health Plus Rider Premium | 2,850.00 |
-| Accidental Death Rider Premium | 1,200.00 |
-| Goods and Services Tax (GST) @ 18% | 2,970.00 |
-| Total Premium Received | 19,470.00 |
+3.2 Reserve Adequacy Review: All reserves exceeding $1,000,000 shall be reviewed monthly. Reserves exceeding $5,000,000 shall be reviewed weekly.
 
-Payment Status: CONFIRMED
-Payment Date: 05 January 2024
-Next Premium Due: 01 January 2025
-Policy Status: IN FORCE
-Premium Period: Annual (01 Jan 2024 – 31 Dec 2024)
+3.3 Incurred But Not Reported (IBNR) Reserve: The actuarial IBNR reserve shall be calculated quarterly using the Chain-Ladder Method and Bornhuetter-Ferguson Method.
 
-This receipt is system generated and does not require a signature.
+## SECTION 4: REINSURANCE RECOVERY
+
+4.1 Where a loss is expected to breach the Reinsurance Attachment Point, the Claims Handler shall:
+(a) Notify the Reinsurance team within 24 hours of identifying the breach potential
+(b) Issue a loss advice to all relevant reinsurers
+(c) Seek reinsurer concurrence for settlements exceeding $500,000
+
+4.2 Reinsurance Bordereaux: Monthly bordereaux shall be submitted to reinsurers for all outstanding losses and recoveries.
 """
 }
 
 
 def get_sample_queries():
+    """Predefined test queries with expected sections (for evaluation)."""
     return [
         {
-            "query": "Is organ donor medical expenses covered under the policy?",
-            "relevant_sections": ["SECTION 4: PREMIUM CONDITIONS", "SECTION 1: ORGAN DONOR BENEFIT"],
+            "query": "What is the deductible for flood damage?",
+            "relevant_sections": ["SECTION 5: CONDITIONS", "SECTION 2: DEFINITIONS"],
         },
         {
-            "query": "What is the sum assured for the term policy?",
-            "relevant_sections": ["SECTION 1: DEFINITIONS", "SECTION 2: BENEFITS"],
+            "query": "Does this policy cover cyber-induced business interruption losses?",
+            "relevant_sections": ["SECTION 4: EXCLUSIONS", "SECTION 3: COVERAGE"],
         },
         {
-            "query": "What happens if premium is not paid within grace period?",
-            "relevant_sections": ["SECTION 5: LAPSE AND REVIVAL"],
+            "query": "What is the attachment point for the reinsurance Layer 1?",
+            "relevant_sections": ["SECTION B: ATTACHMENT POINT AND LIMIT", "TREATY STRUCTURE"],
         },
         {
-            "query": "What are the fund options and their NAV in the ULIP?",
-            "relevant_sections": ["FUND OPTIONS"],
+            "query": "How soon must claims be notified to the insurer?",
+            "relevant_sections": ["SECTION 5: CONDITIONS", "SECTION 1: FIRST NOTICE OF LOSS (FNOL)"],
         },
         {
-            "query": "What is the discontinuance charge if I surrender in Year 2?",
-            "relevant_sections": ["SECTION 3: SURRENDER VALUE"],
+            "query": "What is the maximum liability under the reinsurance treaty?",
+            "relevant_sections": ["SECTION B: ATTACHMENT POINT AND LIMIT"],
         },
         {
-            "query": "What documents are needed to file a critical illness claim?",
-            "relevant_sections": ["SECTION 3: CLAIM PROCEDURE"],
+            "query": "What are the annual aggregate limits in the reinsurance treaty?",
+            "relevant_sections": ["SECTION B: ATTACHMENT POINT AND LIMIT"],
         },
         {
-            "query": "What is the total premium paid in January 2024 receipt?",
-            "relevant_sections": ["PAYMENT DETAILS"],
+            "query": "What is the basis of settlement for building losses?",
+            "relevant_sections": ["SECTION 5: CONDITIONS"],
         },
         {
-            "query": "What is the general aggregate limit in the ACORD certificate?",
-            "relevant_sections": ["GENERAL LIABILITY COVERAGE"],
+            "query": "Who has authority to handle claims above $2 million?",
+            "relevant_sections": ["SECTION 1: FIRST NOTICE OF LOSS (FNOL)"],
         },
     ]
